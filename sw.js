@@ -1,4 +1,4 @@
-const CACHE = 'leitor-academico-v2';
+const CACHE = 'leitor-academico-v3';
 const APP = ['./','./index.html','./styles.css','./app.js','./manifest.webmanifest'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(APP))));
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
