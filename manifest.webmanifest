@@ -5,5 +5,13 @@
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#111827",
-  "description": "Leitor local de PDFs acadêmicos com rotação, corte de margens e divisão de páginas duplas."
+  "description": "Leitor local de PDFs acadêmicos com rotação, corte de margens, divisão de páginas duplas e exportação.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
