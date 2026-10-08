@@ -1,11 +1,11 @@
 {
-  "name": "Leitor Acadêmico",
-  "short_name": "Leitor",
+  "name": "MeuLeitor",
+  "short_name": "MeuLeitor",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#111827",
-  "theme_color": "#111827",
-  "description": "Leitor local de PDFs acadêmicos com rotação, corte de margens, divisão de páginas duplas e exportação.",
+  "background_color": "#eef3f8",
+  "theme_color": "#0b1f36",
+  "description": "Leitor acadêmico para corrigir PDFs digitalizados: rotação, corte, divisão de páginas duplas e exportação do arquivo final.",
   "icons": [
     {
       "src": "icon.svg",
