@@ -4,13 +4,14 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 const $ = (id) => document.getElementById(id);
 const els = {
   fileInput: $('fileInput'), fileInputBig: $('fileInputBig'), fileName: $('fileName'),
-  emptyState: $('emptyState'), reader: $('reader'), canvas: $('pageCanvas'), stage: $('stage'),
+  emptyState: $('emptyState'), reader: $('reader'), canvas: $('pageCanvas'), canvasWrap: $('canvasWrap'), stage: $('stage'),
   loading: $('loading'), pageLabel: $('pageLabel'), sideLabel: $('sideLabel'), smartStatus: $('smartStatus'),
   prevBtn: $('prevBtn'), nextBtn: $('nextBtn'), rotateLeftBtn: $('rotateLeftBtn'), rotateRightBtn: $('rotateRightBtn'),
   zoomOutBtn: $('zoomOutBtn'), zoomInBtn: $('zoomInBtn'), zoomLabel: $('zoomLabel'), fitBtn: $('fitBtn'),
   smartToggle: $('smartToggle'), splitToggle: $('splitToggle'), autoLandscape: $('autoLandscape'), splitSlider: $('splitSlider'), splitOutput: $('splitOutput'),
   gutterSlider: $('gutterSlider'), gutterOutput: $('gutterOutput'), cropToggle: $('cropToggle'), cropSlider: $('cropSlider'), cropOutput: $('cropOutput'),
-  rtlToggle: $('rtlToggle'), themeBtn: $('themeBtn'), controls: $('controls'), controlsToggle: $('controlsToggle'), controlsClose: $('controlsClose')
+  rtlToggle: $('rtlToggle'), themeBtn: $('themeBtn'), controls: $('controls'), controlsToggle: $('controlsToggle'), controlsClose: $('controlsClose'),
+  splitQuickBtn: $('splitQuickBtn')
 };
 
 let pdf = null;
@@ -19,7 +20,10 @@ let pageNum = 1;
 let half = 0;
 let rotation = 0;
 let zoom = 1;
-let fitWidth = true;
+let baseCssWidth = 0;
+let baseCssHeight = 0;
+let lastViewportWidth = window.innerWidth;
+let splitRules = [];
 let renderToken = 0;
 const analysisCache = new Map();
 const visualAxisCache = new Map();
@@ -36,6 +40,59 @@ const prefs = {
 };
 
 function isMobile() { return window.innerWidth <= 760; }
+
+function splitRulesKey() { return fileKey ? `leitor-split-rules:${fileKey}` : null; }
+
+function loadSplitRules() {
+  const key = splitRulesKey();
+  if (!key) { splitRules = []; return; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) || '[]');
+    splitRules = Array.isArray(raw)
+      ? raw.filter(r => Number.isInteger(r.page) && ['split','whole','auto'].includes(r.mode))
+          .sort((a,b) => a.page - b.page)
+      : [];
+  } catch (_) { splitRules = []; }
+}
+
+function saveSplitRules() {
+  const key = splitRulesKey();
+  if (key) localStorage.setItem(key, JSON.stringify(splitRules));
+}
+
+function manualModeAt(page) {
+  let mode = 'auto';
+  for (const rule of splitRules) {
+    if (rule.page > page) break;
+    mode = rule.mode;
+  }
+  return mode;
+}
+
+function setManualModeFromHere(mode) {
+  splitRules = splitRules.filter(r => r.page !== pageNum);
+  splitRules.push({ page: pageNum, mode });
+  splitRules.sort((a,b) => a.page - b.page);
+  saveSplitRules();
+}
+
+function updateQuickSplitButton(layout = null) {
+  if (!els.splitQuickBtn || !pdf) return;
+  const isSplit = layout ? layout.split : manualModeAt(pageNum) === 'split';
+  els.splitQuickBtn.textContent = isSplit ? '✂ Pausar daqui' : '✂ Dividir daqui';
+  els.splitQuickBtn.classList.toggle('active', isSplit);
+  els.splitQuickBtn.title = isSplit
+    ? 'Exibir página inteira a partir desta página'
+    : 'Forçar divisão a partir desta página';
+}
+
+function applyZoomStyle() {
+  if (!baseCssWidth || !baseCssHeight) return;
+  els.canvas.style.width = `${baseCssWidth * zoom}px`;
+  els.canvas.style.height = `${baseCssHeight * zoom}px`;
+  els.zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+  els.canvasWrap.classList.toggle('zoomed', zoom > 1.02);
+}
 
 function loadGlobalPrefs() {
   const p = JSON.parse(localStorage.getItem('leitorAcademicoPrefs') || '{}');
@@ -131,15 +188,27 @@ async function pageLayout(page) {
   const effectiveRotation = ((page.rotate || 0) + rotation + autoExtra) % 360;
   const viewport = page.getViewport({ scale: 1, rotation: effectiveRotation });
   const visualKey = `${page.pageNumber}:${effectiveRotation}`;
+  const manualMode = manualModeAt(page.pageNumber);
   let axis = null;
 
-  if (prefs.smart) axis = textSpreadAxis(page, analysis, effectiveRotation) || visualAxisCache.get(visualKey) || null;
+  if (manualMode !== 'whole' && prefs.smart) {
+    axis = textSpreadAxis(page, analysis, effectiveRotation) || visualAxisCache.get(visualKey) || null;
+  }
 
-  if (!axis && prefs.split) {
+  if (manualMode === 'split') {
+    if (!axis) {
+      if (!prefs.autoLandscape) axis = 'vertical';
+      else if (viewport.width > viewport.height * 1.08) axis = 'vertical';
+      else if (viewport.height > viewport.width * 1.28) axis = 'horizontal';
+      else axis = 'vertical';
+    }
+  } else if (manualMode === 'whole') {
+    axis = null;
+  } else if (!axis && prefs.split) {
     if (!prefs.autoLandscape || viewport.width > viewport.height * 1.08) axis = 'vertical';
   }
 
-  return { split: !!axis, axis, effectiveRotation, analysis, viewport, visualKey };
+  return { split: !!axis, axis, effectiveRotation, analysis, viewport, visualKey, manualMode };
 }
 
 function inkDensity(canvas, axis, pos, bandPct = .018) {
@@ -206,6 +275,7 @@ async function openFile(file) {
     visualAxisCache.clear();
     els.fileName.textContent = file.name;
     restorePosition();
+    loadSplitRules();
     els.emptyState.classList.add('hidden');
     els.reader.classList.remove('hidden');
     await normalizeHalf();
@@ -245,7 +315,7 @@ async function renderCurrent() {
     await page.render({ canvasContext: sctx, viewport }).promise;
     if (token !== renderToken) return;
 
-    if (prefs.smart && !layout.axis && layout.analysis.textChars < 40) {
+    if (prefs.smart && layout.manualMode !== 'whole' && !layout.axis && layout.analysis.textChars < 40) {
       const visualAxis = visualSpreadAxis(source);
       if (visualAxis) {
         visualAxisCache.set(layout.visualKey, visualAxis);
@@ -287,14 +357,13 @@ async function renderCurrent() {
     }
 
     const available = Math.max(280, els.stage.clientWidth - (isMobile() ? 16 : 36));
-    const logicalScale = fitWidth ? Math.min(1, available / (sw / deviceScale)) : 1;
-    const cssWidth = (sw / deviceScale) * logicalScale * zoom;
-    const cssHeight = (sh / deviceScale) * logicalScale * zoom;
+    const fitScale = Math.min(1, available / (sw / deviceScale));
+    baseCssWidth = (sw / deviceScale) * fitScale;
+    baseCssHeight = (sh / deviceScale) * fitScale;
 
     els.canvas.width = Math.max(1, Math.floor(sw));
     els.canvas.height = Math.max(1, Math.floor(sh));
-    els.canvas.style.width = `${cssWidth}px`;
-    els.canvas.style.height = `${cssHeight}px`;
+    applyZoomStyle();
     const ctx = els.canvas.getContext('2d', { alpha: false });
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, els.canvas.width, els.canvas.height);
@@ -307,7 +376,7 @@ async function renderCurrent() {
       els.sideLabel.textContent = half === 1 ? 'superior · 1ª metade' : 'inferior · 2ª metade';
     } else els.sideLabel.textContent = 'página inteira';
     els.smartStatus.textContent = smartStatusText(layout);
-    els.zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+    updateQuickSplitButton(layout);
     savePosition();
   } finally {
     if (token === renderToken) els.loading.classList.add('hidden');
@@ -353,9 +422,20 @@ els.prevBtn.addEventListener('click', prev);
 els.nextBtn.addEventListener('click', next);
 els.rotateLeftBtn.addEventListener('click', async () => { rotation = (rotation + 270) % 360; half = 0; await normalizeHalf(); await renderCurrent(); closeControlsAfterAdjustment(); });
 els.rotateRightBtn.addEventListener('click', async () => { rotation = (rotation + 90) % 360; half = 0; await normalizeHalf(); await renderCurrent(); closeControlsAfterAdjustment(); });
-els.zoomInBtn.addEventListener('click', async () => { fitWidth = false; zoom = Math.min(3, zoom + .15); await renderCurrent(); closeControlsAfterAdjustment(); });
-els.zoomOutBtn.addEventListener('click', async () => { fitWidth = false; zoom = Math.max(.35, zoom - .15); await renderCurrent(); closeControlsAfterAdjustment(); });
-els.fitBtn.addEventListener('click', async () => { fitWidth = true; zoom = 1; await renderCurrent(); closeControlsAfterAdjustment(); });
+els.zoomInBtn.addEventListener('click', () => { zoom = Math.min(4, zoom * 1.15); applyZoomStyle(); closeControlsAfterAdjustment(); });
+els.zoomOutBtn.addEventListener('click', () => { zoom = Math.max(.5, zoom / 1.15); applyZoomStyle(); closeControlsAfterAdjustment(); });
+els.fitBtn.addEventListener('click', () => { zoom = 1; applyZoomStyle(); closeControlsAfterAdjustment(); });
+
+els.splitQuickBtn.addEventListener('click', async () => {
+  if (!pdf) return;
+  const page = await pdf.getPage(pageNum);
+  const layout = await pageLayout(page);
+  setManualModeFromHere(layout.split ? 'whole' : 'split');
+  half = 0;
+  await normalizeHalf();
+  await renderCurrent();
+  if (isMobile()) els.controls.classList.remove('open');
+});
 
 function bindPref(el, key, parser = v => v) {
   const event = el.type === 'range' ? 'input' : 'change';
@@ -391,15 +471,59 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft' || e.key === 'PageUp') prev();
 });
 let touchStartX = null, touchStartY = null;
-els.stage.addEventListener('touchstart', (e) => { if (e.touches.length === 1) { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; } }, {passive:true});
+let pinchStartDistance = null, pinchStartZoom = 1, pinchActive = false;
+
+function touchDistance(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.hypot(dx, dy);
+}
+
+els.stage.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    pinchActive = true;
+    pinchStartDistance = touchDistance(e.touches);
+    pinchStartZoom = zoom;
+    touchStartX = touchStartY = null;
+  } else if (e.touches.length === 1 && !pinchActive) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }
+}, {passive:true});
+
+els.stage.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 2 && pinchStartDistance) {
+    e.preventDefault();
+    const factor = touchDistance(e.touches) / pinchStartDistance;
+    zoom = Math.max(.5, Math.min(4, pinchStartZoom * factor));
+    applyZoomStyle();
+  }
+}, {passive:false});
+
 els.stage.addEventListener('touchend', (e) => {
-  if (touchStartX == null) return;
+  if (pinchActive) {
+    if (e.touches.length < 2) {
+      pinchActive = false;
+      pinchStartDistance = null;
+    }
+    touchStartX = touchStartY = null;
+    return;
+  }
+  if (touchStartX == null || zoom > 1.05) {
+    touchStartX = touchStartY = null;
+    return;
+  }
   const dx = e.changedTouches[0].clientX - touchStartX;
   const dy = e.changedTouches[0].clientY - touchStartY;
   if (Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy) * 1.4) dx < 0 ? next() : prev();
   touchStartX = touchStartY = null;
 }, {passive:true});
 
-window.addEventListener('resize', () => { if (pdf && fitWidth) renderCurrent(); });
+window.addEventListener('resize', () => {
+  const w = window.innerWidth;
+  if (!pdf || Math.abs(w - lastViewportWidth) < 24) return;
+  lastViewportWidth = w;
+  renderCurrent();
+});
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 loadGlobalPrefs();
