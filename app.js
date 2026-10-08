@@ -1,6 +1,5 @@
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
-import { PDFDocument } from 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm';
-import { migrateLegacyRotation, migrateLegacySplit, normalizeRotation, readingPosition, setMarker, valueAt } from './state.mjs';
+import { compactMarkers, migrateLegacyRotation, migrateLegacySplit, normalizeRotation, readingPosition, setMarker, valueAt } from './state.mjs';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
 const $ = id => document.getElementById(id);
@@ -20,6 +19,7 @@ const ui = {
 
 let pdf = null;
 let sourceFile = null;
+let sourceObjectUrl = null;
 let fileKey = null;
 let pageNum = 1;
 let half = 0;
@@ -36,22 +36,26 @@ const SETTINGS_KEY = 'meuleitor:v2:settings';
 const RECENT_KEY = 'meuleitor:v2:recent';
 
 function key(kind) { return `meuleitor:v2:${kind}:${fileKey}`; }
-function safeJSON(raw, fallback) { try { return JSON.parse(raw); } catch { return fallback; } }
+function storageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function storageSet(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } }
+function safeJSON(raw, fallback) { try { return raw == null ? fallback : JSON.parse(raw); } catch { return fallback; } }
 function isMobile() { return window.innerWidth <= 760; }
 
+function showMessage(message) { alert(message); }
+
 function loadSettings() {
-  Object.assign(prefs, safeJSON(localStorage.getItem(SETTINGS_KEY), {}));
+  Object.assign(prefs, safeJSON(storageGet(SETTINGS_KEY), {}));
   ui.splitSlider.value = prefs.splitAt;
   ui.gutterSlider.value = prefs.gutter;
   ui.cropToggle.checked = !!prefs.crop;
   ui.cropSlider.value = prefs.cropPct;
   ui.rtlToggle.checked = !!prefs.rtl;
-  const dark = localStorage.getItem('meuleitor:v2:theme') === 'dark';
+  const dark = storageGet('meuleitor:v2:theme') === 'dark';
   document.documentElement.classList.toggle('dark', dark);
   ui.themeToggle.checked = dark;
   updateSettingOutputs();
 }
-function saveSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(prefs)); }
+function saveSettings() { storageSet(SETTINGS_KEY, JSON.stringify(prefs)); }
 function updateSettingOutputs() {
   ui.splitOutput.value = `${Number(prefs.splitAt).toFixed(Number(prefs.splitAt) % 1 ? 1 : 0)}%`;
   ui.gutterOutput.value = `${Number(prefs.gutter).toFixed(1)}%`;
@@ -59,49 +63,53 @@ function updateSettingOutputs() {
   ui.cropSliderRow.classList.toggle('hidden', !prefs.crop);
 }
 
+function sanitizeRotationMarkers(list) {
+  return compactMarkers((Array.isArray(list) ? list : []).map(m => ({ page: Number(m.page), value: normalizeRotation(m.value) })), 0);
+}
+function sanitizeSplitMarkers(list) {
+  return compactMarkers((Array.isArray(list) ? list : []).map(m => ({ page: Number(m.page), value: !!m.value })), false);
+}
 function loadDocumentState() {
-  const savedRot = safeJSON(localStorage.getItem(key('rotation')), null);
-  const savedSplit = safeJSON(localStorage.getItem(key('split')), null);
-  if (Array.isArray(savedRot)) rotationMarkers = savedRot;
+  const savedRot = safeJSON(storageGet(key('rotation')), null);
+  const savedSplit = safeJSON(storageGet(key('split')), null);
+  if (Array.isArray(savedRot)) rotationMarkers = sanitizeRotationMarkers(savedRot);
   else {
-    const legacy = safeJSON(localStorage.getItem(`leitor-rotations:${fileKey}`), {});
-    rotationMarkers = migrateLegacyRotation(legacy);
-    localStorage.setItem(key('rotation'), JSON.stringify(rotationMarkers));
+    rotationMarkers = migrateLegacyRotation(safeJSON(storageGet(`leitor-rotations:${fileKey}`), {}));
+    storageSet(key('rotation'), JSON.stringify(rotationMarkers));
   }
-  if (Array.isArray(savedSplit)) splitMarkers = savedSplit;
+  if (Array.isArray(savedSplit)) splitMarkers = sanitizeSplitMarkers(savedSplit);
   else {
-    const legacy = safeJSON(localStorage.getItem(`leitor-split-rules:${fileKey}`), []);
-    splitMarkers = migrateLegacySplit(legacy);
-    localStorage.setItem(key('split'), JSON.stringify(splitMarkers));
+    splitMarkers = migrateLegacySplit(safeJSON(storageGet(`leitor-split-rules:${fileKey}`), []));
+    storageSet(key('split'), JSON.stringify(splitMarkers));
   }
-  const pos = safeJSON(localStorage.getItem(key('position')), null);
-  pageNum = pos?.pageNum ? Math.max(1, Math.min(pdf.numPages, pos.pageNum)) : 1;
+  const pos = safeJSON(storageGet(key('position')), null);
+  pageNum = pos?.pageNum ? Math.max(1, Math.min(pdf.numPages, Number(pos.pageNum) || 1)) : 1;
   half = pos?.half === 2 ? 2 : 0;
 }
 function savePosition() {
-  if (!fileKey) return;
-  localStorage.setItem(key('position'), JSON.stringify({ pageNum, half }));
+  if (fileKey) storageSet(key('position'), JSON.stringify({ pageNum, half }));
 }
 function saveMarkers() {
-  localStorage.setItem(key('rotation'), JSON.stringify(rotationMarkers));
-  localStorage.setItem(key('split'), JSON.stringify(splitMarkers));
+  if (!fileKey) return;
+  storageSet(key('rotation'), JSON.stringify(rotationMarkers));
+  storageSet(key('split'), JSON.stringify(splitMarkers));
 }
 function rotationAt(page) { return normalizeRotation(valueAt(rotationMarkers, page, 0)); }
 function splitAt(page) { return !!valueAt(splitMarkers, page, false); }
 
-function setRotationFromHere(delta) {
+async function setRotationFromHere(delta) {
   const next = normalizeRotation(rotationAt(pageNum) + delta);
   rotationMarkers = setMarker(rotationMarkers, pageNum, next, 0);
   saveMarkers();
   half = 0;
-  renderCurrent();
+  await renderCurrent();
 }
-function toggleSplitFromHere() {
+async function toggleSplitFromHere() {
   splitMarkers = setMarker(splitMarkers, pageNum, !splitAt(pageNum), false);
   saveMarkers();
   half = 0;
-  normalizeHalf();
-  renderCurrent();
+  await normalizeHalf();
+  await renderCurrent();
 }
 
 function axisForViewport(viewport) { return viewport.width >= viewport.height ? 'vertical' : 'horizontal'; }
@@ -111,38 +119,32 @@ function getLayout(page) {
   const split = splitAt(page.pageNumber);
   return { rotation, split, axis: split ? axisForViewport(viewport) : null, viewport };
 }
-
 async function normalizeHalf() {
   if (!pdf) return;
   if (splitAt(pageNum)) {
     if (half !== 1 && half !== 2) half = 1;
   } else half = 0;
 }
-
 function cropRect(source, layout) {
   let sx = 0, sy = 0, sw = source.width, sh = source.height;
   if (prefs.crop) {
-    const crop = prefs.cropPct / 100;
-    const dx = sw * crop, dy = sh * crop;
+    const crop = prefs.cropPct / 100, dx = sw * crop, dy = sh * crop;
     sx += dx; sy += dy; sw -= dx * 2; sh -= dy * 2;
   }
   if (!layout.split) return { sx, sy, sw, sh };
   if (layout.axis === 'vertical') {
-    const cut = sw * prefs.splitAt / 100;
-    const gutter = sw * prefs.gutter / 100;
+    const cut = sw * prefs.splitAt / 100, gutter = sw * prefs.gutter / 100;
     const firstIsLeft = !prefs.rtl;
     const showLeft = (half === 1 && firstIsLeft) || (half === 2 && !firstIsLeft);
     if (showLeft) return { sx, sy, sw: Math.max(1, cut - gutter / 2), sh };
     const start = cut + gutter / 2;
     return { sx: sx + start, sy, sw: Math.max(1, sw - start), sh };
   }
-  const cut = sh * prefs.splitAt / 100;
-  const gutter = sh * prefs.gutter / 100;
+  const cut = sh * prefs.splitAt / 100, gutter = sh * prefs.gutter / 100;
   if (half === 1) return { sx, sy, sw, sh: Math.max(1, cut - gutter / 2) };
   const start = cut + gutter / 2;
   return { sx, sy: sy + start, sw, sh: Math.max(1, sh - start) };
 }
-
 function applyZoomStyle() {
   if (!baseCssWidth || !baseCssHeight) return;
   ui.canvas.style.width = `${baseCssWidth * zoom}px`;
@@ -151,8 +153,8 @@ function applyZoomStyle() {
   ui.canvasWrap.classList.toggle('zoomed', zoom > 1.02);
 }
 
-async function renderCurrent() {
-  if (!pdf) return;
+async function renderCurrent(throwOnError = false) {
+  if (!pdf) return false;
   const token = ++renderToken;
   ui.loading.classList.remove('hidden');
   try {
@@ -168,8 +170,7 @@ async function renderCurrent() {
     const sourceCtx = source.getContext('2d', { alpha: false });
     sourceCtx.fillStyle = '#fff'; sourceCtx.fillRect(0, 0, source.width, source.height);
     await page.render({ canvasContext: sourceCtx, viewport }).promise;
-    if (token !== renderToken) return;
-
+    if (token !== renderToken) return false;
     const rect = cropRect(source, layout);
     const available = Math.max(280, ui.stage.clientWidth - (isMobile() ? 14 : 34));
     const fit = Math.min(1, available / (rect.sw / deviceScale));
@@ -183,8 +184,12 @@ async function renderCurrent() {
     applyZoomStyle();
     updateUI(layout);
     savePosition();
+    return true;
   } catch (error) {
-    console.error(error);
+    console.error('Falha ao renderizar página', error);
+    if (throwOnError) throw error;
+    showMessage('O PDF abriu, mas esta página não pôde ser exibida. Tente voltar ou avançar.');
+    return false;
   } finally {
     if (token === renderToken) ui.loading.classList.add('hidden');
   }
@@ -193,7 +198,11 @@ async function renderCurrent() {
 function updateUI(layout) {
   const reading = readingPosition(pdf.numPages, pageNum, half, splitMarkers);
   ui.pageLabel.textContent = `Leitura ${reading.current} / ${reading.total}`;
-  let side = layout.split ? (layout.axis === 'vertical' ? (half === 1 ? (prefs.rtl ? 'direita · 1ª metade' : 'esquerda · 1ª metade') : (prefs.rtl ? 'esquerda · 2ª metade' : 'direita · 2ª metade')) : (half === 1 ? 'superior · 1ª metade' : 'inferior · 2ª metade')) : 'página inteira';
+  let side = 'página inteira';
+  if (layout.split) {
+    if (layout.axis === 'vertical') side = half === 1 ? (prefs.rtl ? 'direita · 1ª metade' : 'esquerda · 1ª metade') : (prefs.rtl ? 'esquerda · 2ª metade' : 'direita · 2ª metade');
+    else side = half === 1 ? 'superior · 1ª metade' : 'inferior · 2ª metade';
+  }
   ui.sideLabel.textContent = `${side} · folha ${pageNum} / ${pdf.numPages}`;
   const activeSplit = splitAt(pageNum);
   ui.splitQuickBtn.classList.toggle('active', activeSplit);
@@ -203,10 +212,9 @@ function updateUI(layout) {
   const rot = rotationAt(pageNum);
   ui.rotationStatus.textContent = rot ? `Orientação atual: ${rot}° a partir desta folha.` : 'Orientação atual: original.';
   ui.pageSeek.max = String(pdf.numPages); ui.pageSeek.value = String(pageNum); ui.pageJump.max = String(pdf.numPages);
-  ui.jumpHint.textContent = `Folha ${pageNum} de ${pdf.numPages} · toque no número da leitura para abrir este navegador.`;
+  ui.jumpHint.textContent = `Folha ${pageNum} de ${pdf.numPages}.`;
   renderRulesSummary();
 }
-
 function renderRulesSummary() {
   ui.rulesSummary.replaceChildren();
   const rules = [];
@@ -216,9 +224,7 @@ function renderRulesSummary() {
   if (!rules.length) {
     const div = document.createElement('div'); div.className = 'rule-chip'; div.textContent = 'Nenhuma alteração por trecho.'; ui.rulesSummary.append(div); return;
   }
-  for (const rule of rules) {
-    const div = document.createElement('div'); div.className = 'rule-chip'; div.textContent = `Folha ${rule.page} · ${rule.text}`; ui.rulesSummary.append(div);
-  }
+  for (const rule of rules) { const div = document.createElement('div'); div.className = 'rule-chip'; div.textContent = `Folha ${rule.page} · ${rule.text}`; ui.rulesSummary.append(div); }
 }
 
 async function next() {
@@ -227,8 +233,7 @@ async function next() {
   try {
     if (splitAt(pageNum) && half === 1) half = 2;
     else if (pageNum < pdf.numPages) { pageNum++; half = splitAt(pageNum) ? 1 : 0; }
-    await renderCurrent();
-    ui.stage.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    await renderCurrent(); ui.stage.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   } finally { navigationBusy = false; }
 }
 async function prev() {
@@ -237,8 +242,7 @@ async function prev() {
   try {
     if (splitAt(pageNum) && half === 2) half = 1;
     else if (pageNum > 1) { pageNum--; half = splitAt(pageNum) ? 2 : 0; }
-    await renderCurrent();
-    ui.stage.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    await renderCurrent(); ui.stage.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   } finally { navigationBusy = false; }
 }
 async function jumpToPage(value) {
@@ -246,42 +250,108 @@ async function jumpToPage(value) {
   const target = Math.max(1, Math.min(pdf.numPages, Math.round(Number(value))));
   if (!Number.isFinite(target)) return;
   pageNum = target; half = splitAt(pageNum) ? 1 : 0;
-  await renderCurrent();
-  ui.stage.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  await renderCurrent(); ui.stage.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+}
+
+function attachPasswordHandler(task) {
+  task.onPassword = (updatePassword, reason) => {
+    const first = reason === pdfjsLib.PasswordResponses?.NEED_PASSWORD;
+    const password = prompt(first ? 'Este PDF é protegido por senha. Digite a senha:' : 'Senha incorreta. Tente novamente:');
+    if (password == null) task.destroy(); else updatePassword(password);
+  };
+}
+function shouldSkipFallback(error) {
+  return ['InvalidPDFException', 'PasswordException'].includes(error?.name);
+}
+async function readFileBytes(file) {
+  if (typeof file.arrayBuffer === 'function') {
+    try { return new Uint8Array(await file.arrayBuffer()); } catch (error) { console.warn('arrayBuffer falhou; tentando FileReader', error); }
+  }
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result));
+    reader.onerror = () => reject(reader.error || new Error('Não foi possível ler o arquivo.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+async function loadPdfRobust(file) {
+  let url = null;
+  let firstError = null;
+  try {
+    url = URL.createObjectURL(file);
+    const task = pdfjsLib.getDocument({ url, disableRange: true, disableStream: true });
+    attachPasswordHandler(task);
+    return { doc: await task.promise, url };
+  } catch (error) {
+    firstError = error;
+    if (url) URL.revokeObjectURL(url);
+    if (shouldSkipFallback(error)) throw error;
+    console.warn('Abertura por URL local falhou; tentando leitura direta.', error);
+  }
+  try {
+    const bytes = await readFileBytes(file);
+    if (!bytes.length) throw new Error('Arquivo vazio.');
+    const task = pdfjsLib.getDocument({ data: bytes });
+    attachPasswordHandler(task);
+    return { doc: await task.promise, url: null };
+  } catch (error) {
+    error.firstAttempt = firstError;
+    throw error;
+  }
+}
+function friendlyOpenError(error) {
+  const name = error?.name || '';
+  const message = String(error?.message || '').toLowerCase();
+  if (name === 'PasswordException') return 'Este PDF é protegido por senha ou a senha informada não foi aceita.';
+  if (name === 'InvalidPDFException' || message.includes('invalid pdf')) return 'O arquivo selecionado não parece ser um PDF válido ou está corrompido.';
+  if (name === 'MissingPDFException' || name === 'UnexpectedResponseException' || message.includes('fetch') || message.includes('network') || message.includes('read')) return 'Não consegui ler esse PDF no aparelho. Se ele estiver no iCloud, Google Drive ou outro serviço, baixe o arquivo para o iPhone e tente novamente.';
+  if (name === 'RangeError' || message.includes('memory')) return 'Este PDF é grande demais para a memória disponível no navegador. Feche outras abas e tente novamente.';
+  return 'Não foi possível abrir este PDF. Tente selecioná-lo novamente. Se estiver no iCloud ou Drive, salve-o primeiro no aparelho.';
 }
 
 async function openFile(file) {
   if (!file) return;
+  if (!/\.pdf$/i.test(file.name || '') && file.type !== 'application/pdf') { showMessage('Selecione um arquivo PDF.'); return; }
+  if (!file.size) { showMessage('Este arquivo está vazio ou ainda não foi baixado para o aparelho.'); return; }
   ui.loading.classList.remove('hidden');
+  let loaded = null;
   try {
-    sourceFile = file;
+    loaded = await loadPdfRobust(file);
+    const oldPdf = pdf, oldUrl = sourceObjectUrl;
+    pdf = loaded.doc; sourceObjectUrl = loaded.url; sourceFile = file;
     fileKey = `${file.name}:${file.size}:${file.lastModified}`;
-    pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
     ui.fileName.textContent = file.name;
-    loadDocumentState();
+    try { loadDocumentState(); } catch (stateError) {
+      console.warn('Estado salvo inválido; abrindo com estado limpo.', stateError);
+      rotationMarkers = []; splitMarkers = []; pageNum = 1; half = 0;
+    }
     rememberRecent(file);
-    ui.emptyState.classList.add('hidden');
-    ui.reader.classList.remove('hidden');
-    ui.homeBackBtn.classList.remove('hidden');
-    ui.exportBtn.disabled = false;
+    ui.emptyState.classList.add('hidden'); ui.reader.classList.remove('hidden'); ui.homeBackBtn.classList.remove('hidden'); ui.exportBtn.disabled = false;
     ui.exportName.value = `${file.name.replace(/\.pdf$/i, '')} - ajustado.pdf`;
-    await renderCurrent();
+    const rendered = await renderCurrent(true);
+    if (!rendered) throw new Error('Primeira página não renderizada.');
+    if (oldPdf && oldPdf !== pdf) oldPdf.destroy().catch?.(() => {});
+    if (oldUrl && oldUrl !== sourceObjectUrl) URL.revokeObjectURL(oldUrl);
   } catch (error) {
-    console.error(error);
-    alert('Não foi possível abrir este PDF.');
-  } finally { ui.loading.classList.add('hidden'); }
+    console.error('Falha ao abrir PDF', error, error?.firstAttempt || '');
+    if (loaded?.doc && loaded.doc !== pdf) loaded.doc.destroy().catch?.(() => {});
+    if (loaded?.url && loaded.url !== sourceObjectUrl) URL.revokeObjectURL(loaded.url);
+    showMessage(friendlyOpenError(error));
+  } finally {
+    ui.loading.classList.add('hidden');
+  }
 }
 
 function rememberRecent(file) {
-  const entries = safeJSON(localStorage.getItem(RECENT_KEY), []).filter(x => x.key !== fileKey);
+  const entries = safeJSON(storageGet(RECENT_KEY), []).filter(x => x.key !== fileKey);
   entries.unshift({ key: fileKey, name: file.name });
-  localStorage.setItem(RECENT_KEY, JSON.stringify(entries.slice(0, 5)));
+  storageSet(RECENT_KEY, JSON.stringify(entries.slice(0, 5)));
   renderRecent();
 }
 function renderRecent() {
-  const entries = safeJSON(localStorage.getItem(RECENT_KEY), []);
+  const entries = safeJSON(storageGet(RECENT_KEY), []);
   ui.recentFiles.replaceChildren();
-  if (!entries.length) return;
+  if (!Array.isArray(entries) || !entries.length) return;
   const title = document.createElement('strong'); title.textContent = 'Lidos recentemente'; ui.recentFiles.append(title);
   entries.forEach(entry => {
     const row = document.createElement('div'); row.className = 'recent-row';
@@ -292,13 +362,10 @@ function renderRecent() {
 }
 
 function bindSettings() {
-  const ranged = [
-    [ui.splitSlider, 'splitAt', Number], [ui.gutterSlider, 'gutter', Number], [ui.cropSlider, 'cropPct', Number]
-  ];
-  ranged.forEach(([el, prop, parse]) => el.addEventListener('input', async () => { prefs[prop] = parse(el.value); saveSettings(); updateSettingOutputs(); await renderCurrent(); }));
+  [[ui.splitSlider, 'splitAt'], [ui.gutterSlider, 'gutter'], [ui.cropSlider, 'cropPct']].forEach(([el, prop]) => el.addEventListener('input', async () => { prefs[prop] = Number(el.value); saveSettings(); updateSettingOutputs(); await renderCurrent(); }));
   ui.cropToggle.addEventListener('change', async () => { prefs.crop = ui.cropToggle.checked; saveSettings(); updateSettingOutputs(); await renderCurrent(); });
   ui.rtlToggle.addEventListener('change', async () => { prefs.rtl = ui.rtlToggle.checked; saveSettings(); await renderCurrent(); });
-  ui.themeToggle.addEventListener('change', () => { document.documentElement.classList.toggle('dark', ui.themeToggle.checked); localStorage.setItem('meuleitor:v2:theme', ui.themeToggle.checked ? 'dark' : 'light'); });
+  ui.themeToggle.addEventListener('change', () => { document.documentElement.classList.toggle('dark', ui.themeToggle.checked); storageSet('meuleitor:v2:theme', ui.themeToggle.checked ? 'dark' : 'light'); });
 }
 
 function safeName(value) {
@@ -312,19 +379,17 @@ function qualityConfig() {
 }
 function exportRects(canvas, split, axis) {
   let sx = 0, sy = 0, sw = canvas.width, sh = canvas.height;
-  if (prefs.crop) { const crop = prefs.cropPct / 100; const dx = sw * crop, dy = sh * crop; sx += dx; sy += dy; sw -= 2 * dx; sh -= 2 * dy; }
+  if (prefs.crop) { const crop = prefs.cropPct / 100, dx = sw * crop, dy = sh * crop; sx += dx; sy += dy; sw -= 2 * dx; sh -= 2 * dy; }
   if (!split) return [{ sx, sy, sw, sh }];
   if (axis === 'vertical') {
     const cut = sw * prefs.splitAt / 100, gutter = sw * prefs.gutter / 100;
     const left = { sx, sy, sw: Math.max(1, cut - gutter / 2), sh };
-    const start = cut + gutter / 2;
-    const right = { sx: sx + start, sy, sw: Math.max(1, sw - start), sh };
+    const start = cut + gutter / 2, right = { sx: sx + start, sy, sw: Math.max(1, sw - start), sh };
     return prefs.rtl ? [right, left] : [left, right];
   }
   const cut = sh * prefs.splitAt / 100, gutter = sh * prefs.gutter / 100;
   const top = { sx, sy, sw, sh: Math.max(1, cut - gutter / 2) };
-  const start = cut + gutter / 2;
-  const bottom = { sx, sy: sy + start, sw, sh: Math.max(1, sh - start) };
+  const start = cut + gutter / 2, bottom = { sx, sy: sy + start, sw, sh: Math.max(1, sh - start) };
   return [top, bottom];
 }
 async function canvasBlob(canvas, quality) { return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Falha ao converter página.')), 'image/jpeg', quality)); }
@@ -333,37 +398,42 @@ async function appendPdfPage(out, source, rect, quality) {
   const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(rect.sw * factor)); canvas.height = Math.max(1, Math.round(rect.sh * factor));
   const ctx = canvas.getContext('2d', { alpha: false }); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(source, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, canvas.width, canvas.height);
   const image = await out.embedJpg(await (await canvasBlob(canvas, quality.jpeg)).arrayBuffer());
-  const ratio = canvas.width / canvas.height; const width = ratio <= 1 ? 842 * ratio : 842; const height = ratio <= 1 ? 842 : 842 / ratio;
+  const ratio = canvas.width / canvas.height, width = ratio <= 1 ? 842 * ratio : 842, height = ratio <= 1 ? 842 : 842 / ratio;
   out.addPage([width, height]).drawImage(image, { x: 0, y: 0, width, height });
 }
 async function saveGenerated(bytes, name) {
-  const blob = new Blob([bytes], { type: 'application/pdf' }); const file = new File([blob], name, { type: 'application/pdf' });
+  const blob = new Blob([bytes], { type: 'application/pdf' }), file = new File([blob], name, { type: 'application/pdf' });
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     try { await navigator.share({ files: [file], title: name }); return; } catch (error) { if (error?.name === 'AbortError') return; }
   }
-  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 120000);
+  const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
 async function exportPdf() {
   if (!pdf || !sourceFile) return;
   ui.exportStartBtn.disabled = true; ui.exportCancelBtn.disabled = true; ui.exportProgressWrap.classList.remove('hidden'); ui.exportNote.textContent = '';
   try {
-    const quality = qualityConfig(); const out = await PDFDocument.create();
+    const { PDFDocument } = await import('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm');
+    const quality = qualityConfig(), out = await PDFDocument.create();
     for (let n = 1; n <= pdf.numPages; n++) {
       ui.exportProgressBar.style.width = `${Math.round((n - 1) / pdf.numPages * 100)}%`; ui.exportProgressText.textContent = `Processando ${n} de ${pdf.numPages}`;
       await new Promise(requestAnimationFrame);
-      const page = await pdf.getPage(n); const rotation = rotationAt(n); const viewport = page.getViewport({ scale: quality.scale, rotation: ((page.rotate || 0) + rotation) % 360 });
+      const page = await pdf.getPage(n), rotation = rotationAt(n), viewport = page.getViewport({ scale: quality.scale, rotation: ((page.rotate || 0) + rotation) % 360 });
       const source = document.createElement('canvas'); source.width = Math.floor(viewport.width); source.height = Math.floor(viewport.height);
       const ctx = source.getContext('2d', { alpha: false }); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, source.width, source.height); await page.render({ canvasContext: ctx, viewport }).promise;
-      const split = splitAt(n); const axis = split ? axisForViewport(viewport) : null;
+      const split = splitAt(n), axis = split ? axisForViewport(viewport) : null;
       for (const rect of exportRects(source, split, axis)) await appendPdfPage(out, source, rect, quality);
     }
     ui.exportProgressBar.style.width = '100%'; ui.exportProgressText.textContent = 'Finalizando…';
     const name = safeName(ui.exportName.value); await saveGenerated(await out.save({ useObjectStreams: true }), name); ui.exportNote.textContent = `PDF pronto: ${name}`;
-  } catch (error) { console.error(error); ui.exportNote.textContent = 'Não foi possível gerar o PDF. Tente novamente.'; }
+  } catch (error) { console.error(error); ui.exportNote.textContent = 'Não foi possível gerar o PDF. Verifique sua conexão e tente novamente.'; }
   finally { ui.exportStartBtn.disabled = false; ui.exportCancelBtn.disabled = false; }
 }
 
-[ui.fileInput, ui.fileInputBig].forEach(input => input.addEventListener('change', e => openFile(e.target.files?.[0])));
+[ui.fileInput, ui.fileInputBig].forEach(input => input.addEventListener('change', async e => {
+  const file = e.target.files?.[0];
+  await openFile(file);
+  e.target.value = '';
+}));
 ui.homeBackBtn.addEventListener('click', () => { savePosition(); ui.controls.classList.remove('open'); ui.jumpSheet.classList.remove('open'); ui.reader.classList.add('hidden'); ui.emptyState.classList.remove('hidden'); ui.homeBackBtn.classList.add('hidden'); });
 ui.controlsToggle.addEventListener('click', () => { ui.jumpSheet.classList.remove('open'); ui.controls.classList.toggle('open'); });
 ui.controlsClose.addEventListener('click', () => ui.controls.classList.remove('open'));
@@ -411,5 +481,7 @@ ui.stage.addEventListener('touchend', e => {
 
 let resizeTimer = null;
 window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (pdf) renderCurrent(); }, 120); });
+window.addEventListener('pagehide', () => { savePosition(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
-loadSettings(); renderRecent();
+loadSettings();
+renderRecent();
