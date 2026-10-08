@@ -1,0 +1,9 @@
+{
+  "name": "Leitor Acadêmico",
+  "short_name": "Leitor",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "description": "Leitor local de PDFs acadêmicos com rotação, corte de margens e divisão de páginas duplas."
+}
