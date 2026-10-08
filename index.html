@@ -38,6 +38,7 @@
         <p class="empty-lead">Gire, corte, divida páginas duplas e gere um PDF novo — tudo no seu aparelho.</p>
         <label class="primary-open"><span>＋</span> Selecionar PDF<input id="fileInputBig" type="file" accept="application/pdf,.pdf" hidden /></label>
         <p class="privacy-note">O arquivo permanece no seu dispositivo.</p>
+        <div id="recentFiles" class="recent-files" aria-live="polite"></div>
         <div class="feature-grid">
           <div><b>↻</b><span><strong>Orientação</strong><small>Gire scans difíceis.</small></span></div>
           <div><b>✂</b><span><strong>Página dupla</strong><small>Divida livro aberto.</small></span></div>
@@ -58,6 +59,7 @@
           <span><b>Modo inteligente</b><small>Analisa cada página separadamente</small></span>
           <input id="smartToggle" type="checkbox" checked />
         </label>
+        <div class="control-group"><b>Revisar divisões</b><small>Escolha uma marcação para voltar à página.</small><div id="ruleReview" class="rule-review"></div></div>
         <div id="smartStatus" class="smart-status">Automático por página</div>
 
         <div class="control-row compact" aria-label="Rotação e zoom">
@@ -115,6 +117,7 @@
       <div class="reader-tools" aria-label="Ações rápidas">
         <button id="splitQuickBtn" class="split-quick tool-chip" type="button"><span class="tool-icon">✂</span><span class="tool-label">Dividir</span></button>
         <button id="exportBtn" class="export-quick tool-chip" type="button" disabled><span class="tool-icon">⇩</span><span class="tool-label">Baixar</span></button>
+        <button id="focusBtn" class="tool-chip" type="button" aria-pressed="false" title="Ocultar barras para leitura"><span class="tool-icon">⛶</span><span class="tool-label">Foco</span></button>
         <button id="controlsToggle" class="controls-toggle tool-chip" type="button"><span class="tool-icon">⚙</span><span class="tool-label">Ajustes</span></button>
       </div>
 
