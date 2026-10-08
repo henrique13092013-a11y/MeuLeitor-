@@ -1,7 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Leitor Acadêmico">
-  <rect width="512" height="512" rx="112" fill="#111827"/>
-  <path d="M82 139c0-19 15-34 34-34h92c25 0 46 8 60 24v255c-15-13-35-20-60-20h-92c-19 0-34-15-34-34V139Z" fill="#F8FAFC"/>
-  <path d="M430 139c0-19-15-34-34-34h-92c-25 0-46 8-60 24v255c15-13 35-20 60-20h92c19 0 34-15 34-34V139Z" fill="#E5E7EB"/>
-  <rect x="248" y="116" width="16" height="276" rx="8" fill="#60A5FA"/>
-  <path d="M119 164h91M119 204h91M119 244h70M302 164h91M302 204h91M323 244h70" stroke="#CBD5E1" stroke-width="12" stroke-linecap="round" opacity=".88"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MeuLeitor">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="44" x2="442" y2="468" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#31B6F6"/>
+      <stop offset=".52" stop-color="#0A84FF"/>
+      <stop offset="1" stop-color="#1766C2"/>
+    </linearGradient>
+    <linearGradient id="paperL" x1="120" y1="122" x2="256" y2="384" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EAF2FB"/>
+    </linearGradient>
+    <linearGradient id="paperR" x1="392" y1="122" x2="256" y2="384" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DDEAF7"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#052A57" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <g filter="url(#shadow)">
+    <path d="M86 145c0-20 16-36 36-36h86c27 0 48 9 61 25v250c-16-12-36-18-61-18h-86c-20 0-36-16-36-36V145Z" fill="url(#paperL)"/>
+    <path d="M426 145c0-20-16-36-36-36h-86c-27 0-48 9-61 25v250c16-12 36-18 61-18h86c20 0 36-16 36-36V145Z" fill="url(#paperR)"/>
+  </g>
+  <rect x="250" y="125" width="12" height="270" rx="6" fill="#0A84FF"/>
+  <path d="M118 163h89M118 200h89M118 237h72M118 274h82M305 163h89M305 200h89M323 237h71M313 274h81" stroke="#B9CBE0" stroke-width="10" stroke-linecap="round" opacity=".82"/>
+  <path d="M98 392c39-8 78-8 117 0 18 4 31 9 41 16 10-7 23-12 41-16 39-8 78-8 117 0" fill="none" stroke="#F8FBFF" stroke-width="12" stroke-linecap="round" opacity=".72"/>
 </svg>
