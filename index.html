@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#111827" />
-  <title>Leitor Acadêmico</title>
+  <meta name="theme-color" content="#0b1f36" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="MeuLeitor" />
+  <title>MeuLeitor</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
@@ -16,13 +19,13 @@
     <div class="brand">
       <img class="app-mark" src="icon.svg" alt="" />
       <div class="brand-copy">
-        <strong>Leitor Acadêmico</strong>
+        <strong>MeuLeitor</strong>
         <span id="fileName">Nenhum PDF aberto</span>
       </div>
     </div>
     <div class="top-actions">
-      <button id="themeBtn" class="icon-btn" title="Alternar tema">◐</button>
-      <label class="open-btn">Abrir PDF<input id="fileInput" type="file" accept="application/pdf,.pdf" hidden /></label>
+      <button id="themeBtn" class="icon-btn" title="Alternar tema" aria-label="Alternar tema">◐</button>
+      <label class="open-btn"><span class="open-symbol">＋</span> Abrir<input id="fileInput" type="file" accept="application/pdf,.pdf" hidden /></label>
     </div>
   </header>
 
@@ -30,18 +33,26 @@
     <section id="emptyState" class="empty-state">
       <div class="empty-card">
         <img class="empty-app-icon" src="icon.svg" alt="" />
-        <h1>Leia scans de livros sem sofrimento</h1>
-        <p>Abra um PDF do seu aparelho. O arquivo permanece local: nada é enviado ao site.</p>
-        <label class="primary-open">Selecionar PDF<input id="fileInputBig" type="file" accept="application/pdf,.pdf" hidden /></label>
+        <p class="eyebrow">MEULEITOR</p>
+        <h1>Seus textos da faculdade,<br>do seu jeito.</h1>
+        <p class="empty-lead">Gire, corte, divida páginas duplas e gere um PDF novo — tudo no seu aparelho.</p>
+        <label class="primary-open"><span>＋</span> Selecionar PDF<input id="fileInputBig" type="file" accept="application/pdf,.pdf" hidden /></label>
+        <p class="privacy-note">O arquivo permanece no seu dispositivo.</p>
         <div class="feature-grid">
-          <span>↻ Rotação</span><span>✂ Página dupla</span><span>▣ Corte de margens</span><span>⇩ Exportar PDF</span>
+          <div><b>↻</b><span><strong>Orientação</strong><small>Gire scans difíceis.</small></span></div>
+          <div><b>✂</b><span><strong>Página dupla</strong><small>Divida livro aberto.</small></span></div>
+          <div><b>⌗</b><span><strong>Corte</strong><small>Remova margens e lombada.</small></span></div>
+          <div><b>⇩</b><span><strong>PDF final</strong><small>Renomeie e salve pronto.</small></span></div>
         </div>
       </div>
     </section>
 
     <section id="reader" class="reader hidden">
       <aside id="controls" class="controls">
-        <div class="controls-head"><b>Ajustes</b><button id="controlsClose" class="controls-close" aria-label="Fechar ajustes">×</button></div>
+        <div class="controls-head">
+          <div><b>Ajustes</b><small>Alterações aplicadas imediatamente</small></div>
+          <button id="controlsClose" class="controls-close" aria-label="Fechar ajustes">×</button>
+        </div>
 
         <label class="switch-row smart-row">
           <span><b>Modo inteligente</b><small>Analisa cada página separadamente</small></span>
@@ -49,7 +60,7 @@
         </label>
         <div id="smartStatus" class="smart-status">Automático por página</div>
 
-        <div class="control-row compact">
+        <div class="control-row compact" aria-label="Rotação e zoom">
           <button id="rotateLeftBtn" title="Girar 90° à esquerda">↶</button>
           <button id="rotateRightBtn" title="Girar 90° à direita">↷</button>
           <button id="zoomOutBtn" title="Diminuir zoom">−</button>
@@ -60,7 +71,7 @@
 
         <div class="control-group">
           <label class="switch-row">
-            <span><b>Forçar no arquivo inteiro</b><small>Use somente quando quase todas as folhas forem duplas</small></span>
+            <span><b>Forçar no arquivo inteiro</b><small>Para PDFs em que quase todas as folhas são duplas</small></span>
             <input id="splitToggle" type="checkbox" />
           </label>
           <label class="switch-row sub">
@@ -96,16 +107,16 @@
         </div>
       </aside>
 
-      <div class="reader-tools">
-        <button id="splitQuickBtn" class="split-quick" type="button">✂ Dividir daqui</button>
-        <button id="exportBtn" class="export-quick" type="button" disabled>⇩ PDF</button>
-        <button id="controlsToggle" class="controls-toggle">Ajustes</button>
-      </div>
-
       <section id="stage" class="stage" aria-label="Página do PDF">
         <div id="loading" class="loading hidden">Carregando…</div>
         <div id="canvasWrap" class="canvas-wrap"><canvas id="pageCanvas"></canvas></div>
       </section>
+
+      <div class="reader-tools" aria-label="Ações rápidas">
+        <button id="splitQuickBtn" class="split-quick tool-chip" type="button"><span class="tool-icon">✂</span><span class="tool-label">Dividir</span></button>
+        <button id="exportBtn" class="export-quick tool-chip" type="button" disabled><span class="tool-icon">⇩</span><span class="tool-label">Baixar</span></button>
+        <button id="controlsToggle" class="controls-toggle tool-chip" type="button"><span class="tool-icon">⚙</span><span class="tool-label">Ajustes</span></button>
+      </div>
 
       <nav class="bottom-nav">
         <button id="prevBtn" class="nav-btn" aria-label="Página anterior">‹</button>
@@ -120,23 +131,39 @@
 
   <div id="exportModal" class="export-modal hidden" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
     <div class="export-sheet">
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <div class="export-symbol" aria-hidden="true">⇩</div>
       <div class="export-head">
         <div>
           <b id="exportTitle">Baixar PDF final</b>
-          <small>O processamento acontece no seu aparelho.</small>
+          <small>Gere um novo arquivo com seus ajustes.</small>
         </div>
         <button id="exportCancelBtn" class="export-close" aria-label="Fechar">×</button>
       </div>
+
       <label class="export-field">
         <span>Nome do arquivo</span>
         <input id="exportName" type="text" autocomplete="off" spellcheck="false" />
       </label>
+
+      <fieldset class="quality-group">
+        <legend>Qualidade</legend>
+        <label class="quality-option">
+          <span><b>Padrão</b><small>Boa leitura e arquivo menor</small></span>
+          <input type="radio" name="exportQuality" value="standard" checked />
+        </label>
+        <label class="quality-option">
+          <span><b>Alta qualidade</b><small>Mais definição e arquivo maior</small></span>
+          <input type="radio" name="exportQuality" value="high" />
+        </label>
+      </fieldset>
+
       <p id="exportNote" class="export-note"></p>
       <div id="exportProgressWrap" class="export-progress hidden">
         <div class="export-progress-track"><div id="exportProgressBar" class="export-progress-bar"></div></div>
         <span id="exportProgressText"></span>
       </div>
-      <button id="exportStartBtn" class="export-start" type="button">Gerar e baixar PDF</button>
+      <button id="exportStartBtn" class="export-start" type="button"><span>⇩</span> Gerar e salvar</button>
     </div>
   </div>
 
