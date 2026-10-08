@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Leitor Acadêmico">
+  <rect width="512" height="512" rx="112" fill="#111827"/>
+  <path d="M82 139c0-19 15-34 34-34h92c25 0 46 8 60 24v255c-15-13-35-20-60-20h-92c-19 0-34-15-34-34V139Z" fill="#F8FAFC"/>
+  <path d="M430 139c0-19-15-34-34-34h-92c-25 0-46 8-60 24v255c15-13 35-20 60-20h92c19 0 34-15 34-34V139Z" fill="#E5E7EB"/>
+  <rect x="248" y="116" width="16" height="276" rx="8" fill="#60A5FA"/>
+  <path d="M119 164h91M119 204h91M119 244h70M302 164h91M302 204h91M323 244h70" stroke="#CBD5E1" stroke-width="12" stroke-linecap="round" opacity=".88"/>
+</svg>
