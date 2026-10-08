@@ -54,7 +54,7 @@
 
         <div class="control-group">
           <label class="switch-row">
-            <span><b>Forçar página dupla</b><small>Use se o automático não detectar</small></span>
+            <span><b>Forçar no arquivo inteiro</b><small>Use somente quando quase todas as folhas forem duplas</small></span>
             <input id="splitToggle" type="checkbox" />
           </label>
           <label class="switch-row sub">
@@ -90,7 +90,10 @@
         </div>
       </aside>
 
-      <button id="controlsToggle" class="controls-toggle">Ajustes</button>
+      <div class="reader-tools">
+        <button id="splitQuickBtn" class="split-quick" type="button">✂ Dividir daqui</button>
+        <button id="controlsToggle" class="controls-toggle">Ajustes</button>
+      </div>
 
       <section id="stage" class="stage" aria-label="Página do PDF">
         <div id="loading" class="loading hidden">Carregando…</div>
