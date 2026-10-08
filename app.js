@@ -22,6 +22,7 @@ let zoom = 1;
 let fitWidth = true;
 let renderToken = 0;
 const analysisCache = new Map();
+const visualAxisCache = new Map();
 
 const prefs = {
   smart: true,
@@ -129,15 +130,61 @@ async function pageLayout(page) {
   const autoExtra = prefs.smart ? analysis.autoRotation : 0;
   const effectiveRotation = ((page.rotate || 0) + rotation + autoExtra) % 360;
   const viewport = page.getViewport({ scale: 1, rotation: effectiveRotation });
+  const visualKey = `${page.pageNumber}:${effectiveRotation}`;
   let axis = null;
 
-  if (prefs.smart) axis = textSpreadAxis(page, analysis, effectiveRotation);
+  if (prefs.smart) axis = textSpreadAxis(page, analysis, effectiveRotation) || visualAxisCache.get(visualKey) || null;
 
   if (!axis && prefs.split) {
     if (!prefs.autoLandscape || viewport.width > viewport.height * 1.08) axis = 'vertical';
   }
 
-  return { split: !!axis, axis, effectiveRotation, analysis, viewport };
+  return { split: !!axis, axis, effectiveRotation, analysis, viewport, visualKey };
+}
+
+function inkDensity(canvas, axis, pos, bandPct = .018) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const w = canvas.width, h = canvas.height;
+  const sampleStep = Math.max(2, Math.floor(Math.min(w, h) / 180));
+  let dark = 0, total = 0;
+  if (axis === 'vertical') {
+    const halfBand = Math.max(1, Math.floor(w * bandPct / 2));
+    const cx = Math.floor(w * pos);
+    for (let x = Math.max(0, cx-halfBand); x < Math.min(w, cx+halfBand); x += sampleStep) {
+      for (let y = 0; y < h; y += sampleStep) {
+        const d = ctx.getImageData(x, y, 1, 1).data;
+        const lum = .2126*d[0] + .7152*d[1] + .0722*d[2];
+        if (lum < 205) dark++;
+        total++;
+      }
+    }
+  } else {
+    const halfBand = Math.max(1, Math.floor(h * bandPct / 2));
+    const cy = Math.floor(h * pos);
+    for (let y = Math.max(0, cy-halfBand); y < Math.min(h, cy+halfBand); y += sampleStep) {
+      for (let x = 0; x < w; x += sampleStep) {
+        const d = ctx.getImageData(x, y, 1, 1).data;
+        const lum = .2126*d[0] + .7152*d[1] + .0722*d[2];
+        if (lum < 205) dark++;
+        total++;
+      }
+    }
+  }
+  return total ? dark / total : 0;
+}
+
+function visualSpreadAxis(canvas) {
+  const ratio = canvas.width / canvas.height;
+  const baselineV = (inkDensity(canvas, 'vertical', .30) + inkDensity(canvas, 'vertical', .70)) / 2;
+  const baselineH = (inkDensity(canvas, 'horizontal', .30) + inkDensity(canvas, 'horizontal', .70)) / 2;
+  let vDev = 0, hDev = 0;
+  for (const p of [.44,.47,.50,.53,.56]) {
+    vDev = Math.max(vDev, Math.abs(inkDensity(canvas, 'vertical', p) - baselineV));
+    hDev = Math.max(hDev, Math.abs(inkDensity(canvas, 'horizontal', p) - baselineH));
+  }
+  if (ratio > 1.58 || (ratio > 1.16 && vDev > .085)) return 'vertical';
+  if (ratio < .56 || (ratio < .78 && hDev > .12)) return 'horizontal';
+  return null;
 }
 
 function smartStatusText(layout) {
@@ -145,7 +192,7 @@ function smartStatusText(layout) {
   const textOk = layout.analysis.textChars >= 24;
   const rot = layout.analysis.autoRotation ? ` · rotação ${layout.analysis.autoRotation}°` : '';
   const split = layout.split ? ` · dupla ${layout.axis === 'vertical' ? 'lado a lado' : 'acima/abaixo'}` : ' · página inteira';
-  return `${textOk ? 'Texto detectado' : 'Scan/imagem'}${rot}${split}`;
+  return `${textOk ? 'Texto detectado' : 'Scan analisado visualmente'}${rot}${split}`;
 }
 
 async function openFile(file) {
@@ -156,6 +203,7 @@ async function openFile(file) {
     pdf = await pdfjsLib.getDocument({ data }).promise;
     fileKey = `${file.name}:${file.size}:${file.lastModified}`;
     analysisCache.clear();
+    visualAxisCache.clear();
     els.fileName.textContent = file.name;
     restorePosition();
     els.emptyState.classList.add('hidden');
@@ -196,6 +244,16 @@ async function renderCurrent() {
     const sctx = source.getContext('2d', { alpha: false });
     await page.render({ canvasContext: sctx, viewport }).promise;
     if (token !== renderToken) return;
+
+    if (prefs.smart && !layout.axis && layout.analysis.textChars < 40) {
+      const visualAxis = visualSpreadAxis(source);
+      if (visualAxis) {
+        visualAxisCache.set(layout.visualKey, visualAxis);
+        layout.axis = visualAxis;
+        layout.split = true;
+        if (half === 0) half = 1;
+      }
+    }
 
     let sx = 0, sy = 0, sw = source.width, sh = source.height;
     const crop = prefs.crop ? (prefs.cropPct / 100) : 0;
