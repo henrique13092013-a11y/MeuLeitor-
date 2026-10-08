@@ -1,5 +1,5 @@
-const CACHE = 'leitor-academico-v4';
-const APP = ['./','./index.html','./styles.css','./app.js','./manifest.webmanifest'];
+const CACHE = 'leitor-academico-v5';
+const APP = ['./','./index.html','./styles.css','./export.css','./app.js','./export.js','./icon.svg','./manifest.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(APP)).then(() => self.skipWaiting()));
