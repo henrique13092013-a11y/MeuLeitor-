@@ -1,4 +1,4 @@
-const CACHE = 'meuleitor-v12';
+const CACHE = 'meuleitor-v13';
 const APP = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const APP = [
   './app.js',
   './export.js',
   './split-range.js',
+  './ux-fixes.js',
   './icon.svg',
   './manifest.webmanifest'
 ];
