@@ -306,3 +306,7 @@ canvas { display: block; max-width: none; background: white; box-shadow: 0 6px 2
   .tool-label { font-size: 9px; }
   .feature-grid { grid-template-columns: 1fr; }
 }
+
+.home-back { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--border); border-radius:11px; background:var(--panel-solid); color:var(--text); padding:8px 10px; cursor:pointer; font-size:12px; font-weight:750; flex-shrink:0; }
+.home-back:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+@media(max-width:760px) { .home-back { padding:7px 8px; font-size:12px; } .home-back span { display:none; } }
