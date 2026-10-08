@@ -324,3 +324,6 @@ canvas { display: block; max-width: none; background: white; box-shadow: 0 6px 2
 .focus-mode .reader-tools { position:fixed; top:12px; right:12px; left:auto; bottom:auto; transform:none; width:auto; }
 .focus-mode .reader-tools > :not(#focusBtn) { display:none !important; }
 .focus-mode .reader-tools #focusBtn { display:inline-flex; }
+
+.page-info { min-width:0; }
+.page-info b { font-variant-numeric:tabular-nums; }
