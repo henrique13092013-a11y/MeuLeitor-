@@ -6,13 +6,18 @@
   <meta name="theme-color" content="#111827" />
   <title>Leitor Acadêmico</title>
   <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <strong>Leitor Acadêmico</strong>
-      <span id="fileName">Nenhum PDF aberto</span>
+      <img class="app-mark" src="icon.svg" alt="" />
+      <div class="brand-copy">
+        <strong>Leitor Acadêmico</strong>
+        <span id="fileName">Nenhum PDF aberto</span>
+      </div>
     </div>
     <div class="top-actions">
       <button id="themeBtn" class="icon-btn" title="Alternar tema">◐</button>
@@ -23,12 +28,12 @@
   <main>
     <section id="emptyState" class="empty-state">
       <div class="empty-card">
-        <div class="book-icon">▤</div>
+        <img class="empty-app-icon" src="icon.svg" alt="" />
         <h1>Leia scans de livros sem sofrimento</h1>
         <p>Abra um PDF do seu aparelho. O arquivo permanece local: nada é enviado ao site.</p>
         <label class="primary-open">Selecionar PDF<input id="fileInputBig" type="file" accept="application/pdf,.pdf" hidden /></label>
         <div class="feature-grid">
-          <span>↻ Rotação</span><span>✂ Página dupla</span><span>▣ Corte de margens</span><span>↔ Ajuste à tela</span>
+          <span>↻ Rotação</span><span>✂ Página dupla</span><span>▣ Corte de margens</span><span>⇩ Exportar PDF</span>
         </div>
       </div>
     </section>
@@ -92,6 +97,7 @@
 
       <div class="reader-tools">
         <button id="splitQuickBtn" class="split-quick" type="button">✂ Dividir daqui</button>
+        <button id="exportBtn" class="export-quick" type="button" disabled>⇩ PDF</button>
         <button id="controlsToggle" class="controls-toggle">Ajustes</button>
       </div>
 
@@ -111,6 +117,29 @@
     </section>
   </main>
 
+  <div id="exportModal" class="export-modal hidden" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+    <div class="export-sheet">
+      <div class="export-head">
+        <div>
+          <b id="exportTitle">Baixar PDF final</b>
+          <small>O processamento acontece no seu aparelho.</small>
+        </div>
+        <button id="exportCancelBtn" class="export-close" aria-label="Fechar">×</button>
+      </div>
+      <label class="export-field">
+        <span>Nome do arquivo</span>
+        <input id="exportName" type="text" autocomplete="off" spellcheck="false" />
+      </label>
+      <p id="exportNote" class="export-note"></p>
+      <div id="exportProgressWrap" class="export-progress hidden">
+        <div class="export-progress-track"><div id="exportProgressBar" class="export-progress-bar"></div></div>
+        <span id="exportProgressText"></span>
+      </div>
+      <button id="exportStartBtn" class="export-start" type="button">Gerar e baixar PDF</button>
+    </div>
+  </div>
+
   <script type="module" src="app.js"></script>
+  <script type="module" src="export.js"></script>
 </body>
 </html>
