@@ -12,21 +12,18 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="export.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><button id="homeBackBtn" class="home-back hidden" type="button" aria-label="Voltar à tela inicial" title="Voltar à tela inicial">← <span>Voltar</span></button>
+    <div class="brand">
+      <button id="homeBackBtn" class="icon-btn hidden" type="button" aria-label="Voltar à tela inicial">←</button>
       <img class="app-mark" src="icon.svg" alt="" />
       <div class="brand-copy">
         <strong>MeuLeitor</strong>
         <span id="fileName">Nenhum PDF aberto</span>
       </div>
     </div>
-    <div class="top-actions">
-      <button id="themeBtn" class="icon-btn" title="Alternar tema" aria-label="Alternar tema">◐</button>
-      <label class="open-btn"><span class="open-symbol">＋</span> Abrir<input id="fileInput" type="file" accept="application/pdf,.pdf" hidden /></label>
-    </div>
+    <label class="open-btn"><span>＋</span> Abrir<input id="fileInput" type="file" accept="application/pdf,.pdf" hidden /></label>
   </header>
 
   <main>
@@ -34,145 +31,110 @@
       <div class="empty-card">
         <img class="empty-app-icon" src="icon.svg" alt="" />
         <p class="eyebrow">MEULEITOR</p>
-        <h1>Seus textos da faculdade,<br>do seu jeito.</h1>
-        <p class="empty-lead">Gire, corte, divida páginas duplas e gere um PDF novo — tudo no seu aparelho.</p>
-        <label class="primary-open"><span>＋</span> Selecionar PDF<input id="fileInputBig" type="file" accept="application/pdf,.pdf" hidden /></label>
-        <p class="privacy-note">O arquivo permanece no seu dispositivo.</p>
+        <h1>PDFs difíceis,<br>leitura simples.</h1>
+        <p class="empty-lead">Gire trechos, divida páginas duplas e salve um PDF ajustado. O arquivo fica no seu aparelho.</p>
+        <label class="primary-open">＋ Selecionar PDF<input id="fileInputBig" type="file" accept="application/pdf,.pdf" hidden /></label>
         <div id="recentFiles" class="recent-files" aria-live="polite"></div>
-        <div class="feature-grid">
-          <div><b>↻</b><span><strong>Orientação</strong><small>Gire scans difíceis.</small></span></div>
-          <div><b>✂</b><span><strong>Página dupla</strong><small>Divida livro aberto.</small></span></div>
-          <div><b>⌗</b><span><strong>Corte</strong><small>Remova margens e lombada.</small></span></div>
-          <div><b>⇩</b><span><strong>PDF final</strong><small>Renomeie e salve pronto.</small></span></div>
-        </div>
       </div>
     </section>
 
     <section id="reader" class="reader hidden">
-      <aside id="controls" class="controls">
-        <div class="controls-head">
-          <div><b>Ajustes</b><small>Alterações aplicadas imediatamente</small></div>
-          <button id="controlsClose" class="controls-close" aria-label="Fechar ajustes">×</button>
-        </div>
-
-        <label class="switch-row smart-row">
-          <span><b>Modo inteligente</b><small>Analisa cada página separadamente</small></span>
-          <input id="smartToggle" type="checkbox" checked />
-        </label>
-        <div class="control-group"><b>Revisar divisões</b><small>Cada marcação vale a partir daquela página.</small><div id="ruleReview" class="rule-review"></div></div>
-        <div id="smartStatus" class="smart-status">Automático por página</div>
-
-        <div class="control-row compact" aria-label="Rotação e zoom">
-          <button id="rotateLeftBtn" title="Girar 90° à esquerda">↶</button>
-          <button id="rotateRightBtn" title="Girar 90° à direita">↷</button>
-          <button id="zoomOutBtn" title="Diminuir zoom">−</button>
-          <span id="zoomLabel">100%</span>
-          <button id="zoomInBtn" title="Aumentar zoom">＋</button>
-          <button id="fitBtn" title="Ajustar à largura">↔</button>
-        </div>
-
-        <div class="control-group">
-          <label class="switch-row">
-            <span><b>Forçar no arquivo inteiro</b><small>Para PDFs em que quase todas as folhas são duplas</small></span>
-            <input id="splitToggle" type="checkbox" />
-          </label>
-          <label class="switch-row sub">
-            <span>Ao forçar, somente se estiver horizontal</span>
-            <input id="autoLandscape" type="checkbox" checked />
-          </label>
-          <label class="slider-row">
-            <span>Posição do corte <output id="splitOutput">50%</output></span>
-            <input id="splitSlider" type="range" min="40" max="60" value="50" step="0.5" />
-          </label>
-          <label class="slider-row">
-            <span>Remover lombada <output id="gutterOutput">1.0%</output></span>
-            <input id="gutterSlider" type="range" min="0" max="6" value="1" step="0.25" />
-          </label>
-        </div>
-
-        <div class="control-group">
-          <label class="switch-row">
-            <span><b>Cortar margens</b><small>Recorta as bordas do scan</small></span>
-            <input id="cropToggle" type="checkbox" />
-          </label>
-          <label class="slider-row">
-            <span>Margem externa <output id="cropOutput">3%</output></span>
-            <input id="cropSlider" type="range" min="0" max="14" value="3" step="0.5" />
-          </label>
-        </div>
-
-        <div class="control-group">
-          <label class="switch-row">
-            <span><b>Ordem de leitura</b><small>Esquerda → direita</small></span>
-            <input id="rtlToggle" type="checkbox" />
-          </label>
-        </div>
-      </aside>
-
       <section id="stage" class="stage" aria-label="Página do PDF">
         <div id="loading" class="loading hidden">Carregando…</div>
         <div id="canvasWrap" class="canvas-wrap"><canvas id="pageCanvas"></canvas></div>
       </section>
 
-      <div class="reader-tools" aria-label="Ações rápidas">
-        <button id="splitQuickBtn" class="split-quick tool-chip" type="button"><span class="tool-icon">✂</span><span class="tool-label">Dividir daqui →</span></button>
-        <button id="exportBtn" class="export-quick tool-chip" type="button" disabled><span class="tool-icon">⇩</span><span class="tool-label">Baixar</span></button>
-        <button id="focusBtn" class="tool-chip" type="button" aria-pressed="false" title="Ocultar barras para leitura"><span class="tool-icon">⛶</span><span class="tool-label">Foco</span></button>
-        <button id="controlsToggle" class="controls-toggle tool-chip" type="button"><span class="tool-icon">⚙</span><span class="tool-label">Ajustes</span></button>
+      <div class="quick-tools" aria-label="Ações rápidas">
+        <button id="splitQuickBtn" class="tool-chip" type="button">
+          <span class="tool-icon">✂</span><span id="splitQuickLabel">Dividir daqui</span>
+        </button>
+        <button id="controlsToggle" class="tool-chip" type="button">
+          <span class="tool-icon">⚙</span><span>Ajustes</span>
+        </button>
       </div>
 
-      <nav class="bottom-nav">
-        <button id="prevBtn" class="nav-btn" aria-label="Página anterior">‹</button>
-        <div class="page-info">
-          <b id="pageLabel">—</b>
-          <span id="sideLabel"></span><div class="page-jump"><input id="pageJump" type="number" min="1" inputmode="numeric" aria-label="Ir à página original" placeholder="Folha" /><button id="pageJumpBtn" type="button">Ir</button><button id="returnJumpBtn" type="button" class="hidden">↩ Retornar</button></div><input id="pageSeek" type="range" min="1" max="1" value="1" aria-label="Navegar pelas folhas originais" />
-        </div>
-        <button id="nextBtn" class="nav-btn" aria-label="Próxima página">›</button>
+      <nav class="bottom-nav" aria-label="Navegação do documento">
+        <button id="prevBtn" class="nav-btn" type="button" aria-label="Página anterior">‹</button>
+        <button id="pageInfoBtn" class="page-info-btn" type="button" aria-label="Abrir navegação por página">
+          <strong id="pageLabel">—</strong>
+          <span id="sideLabel"></span>
+        </button>
+        <button id="nextBtn" class="nav-btn" type="button" aria-label="Próxima página">›</button>
       </nav>
+
+      <aside id="controls" class="sheet controls" aria-label="Ajustes do documento">
+        <div class="sheet-head">
+          <div><strong>Ajustes</strong><small>Ficam abertos até você fechar.</small></div>
+          <button id="controlsClose" class="close-btn" type="button" aria-label="Fechar ajustes">×</button>
+        </div>
+
+        <section class="settings-section">
+          <div class="section-title"><strong>Orientação</strong><small>O giro vale desta folha em diante, até você girar de novo.</small></div>
+          <div class="segmented two">
+            <button id="rotateLeftBtn" type="button">↶ Girar à esquerda</button>
+            <button id="rotateRightBtn" type="button">↷ Girar à direita</button>
+          </div>
+          <div id="rotationStatus" class="status-line"></div>
+        </section>
+
+        <section class="settings-section">
+          <div class="section-title"><strong>Página dupla</strong><small>A divisão também vale desta folha em diante.</small></div>
+          <button id="splitSettingsBtn" class="primary-action" type="button">✂ Dividir daqui</button>
+          <label class="slider-row"><span>Posição do corte <output id="splitOutput">50%</output></span><input id="splitSlider" type="range" min="40" max="60" value="50" step="0.5" /></label>
+          <label class="slider-row"><span>Remover lombada <output id="gutterOutput">1.0%</output></span><input id="gutterSlider" type="range" min="0" max="6" value="1" step="0.25" /></label>
+        </section>
+
+        <section class="settings-section">
+          <div class="section-title"><strong>Leitura</strong></div>
+          <div class="segmented three">
+            <button id="zoomOutBtn" type="button" aria-label="Diminuir zoom">−</button>
+            <button id="fitBtn" type="button"><span id="zoomLabel">100%</span></button>
+            <button id="zoomInBtn" type="button" aria-label="Aumentar zoom">＋</button>
+          </div>
+          <label class="switch-row"><span><strong>Cortar margens</strong><small>Recorta as bordas do scan.</small></span><input id="cropToggle" type="checkbox" /></label>
+          <label class="slider-row" id="cropSliderRow"><span>Margem externa <output id="cropOutput">3%</output></span><input id="cropSlider" type="range" min="0" max="14" value="3" step="0.5" /></label>
+          <label class="switch-row"><span><strong>Ordem invertida</strong><small>Use para livros que começam pela direita.</small></span><input id="rtlToggle" type="checkbox" /></label>
+          <label class="switch-row"><span><strong>Tema escuro</strong></span><input id="themeToggle" type="checkbox" /></label>
+        </section>
+
+        <section class="settings-section">
+          <div class="section-title"><strong>Alterações deste arquivo</strong><small>Marcos que passam a valer a partir de determinada folha.</small></div>
+          <div id="rulesSummary" class="rules-summary"></div>
+        </section>
+
+        <button id="exportBtn" class="export-btn" type="button" disabled>⇩ Gerar PDF ajustado</button>
+      </aside>
+
+      <div id="jumpSheet" class="sheet compact-sheet" aria-label="Ir para folha">
+        <div class="sheet-head">
+          <div><strong>Ir para folha</strong><small>Numeração original do PDF.</small></div>
+          <button id="jumpClose" class="close-btn" type="button" aria-label="Fechar navegação">×</button>
+        </div>
+        <div class="jump-row"><input id="pageJump" type="number" min="1" inputmode="numeric" placeholder="Folha" /><button id="pageJumpBtn" type="button">Ir</button></div>
+        <input id="pageSeek" class="seek" type="range" min="1" max="1" value="1" aria-label="Navegar pelas folhas originais" />
+        <div id="jumpHint" class="status-line"></div>
+      </div>
     </section>
   </main>
 
-  <div id="exportModal" class="export-modal hidden" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
-    <div class="export-sheet">
-      <div class="sheet-grabber" aria-hidden="true"></div>
-      <div class="export-symbol" aria-hidden="true">⇩</div>
-      <div class="export-head">
-        <div>
-          <b id="exportTitle">Baixar PDF final</b>
-          <small>Gere um novo arquivo com seus ajustes.</small>
-        </div>
-        <button id="exportCancelBtn" class="export-close" aria-label="Fechar">×</button>
+  <div id="exportModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+    <div class="modal-card">
+      <div class="sheet-head">
+        <div><strong id="exportTitle">Gerar PDF ajustado</strong><small>Aplica os giros, divisões e recortes salvos.</small></div>
+        <button id="exportCancelBtn" class="close-btn" type="button" aria-label="Fechar">×</button>
       </div>
-
-      <label class="export-field">
-        <span>Nome do arquivo</span>
-        <input id="exportName" type="text" autocomplete="off" spellcheck="false" />
-      </label>
-
+      <label class="field"><span>Nome do arquivo</span><input id="exportName" type="text" autocomplete="off" spellcheck="false" /></label>
       <fieldset class="quality-group">
         <legend>Qualidade</legend>
-        <label class="quality-option">
-          <span><b>Padrão</b><small>Boa leitura e arquivo menor</small></span>
-          <input type="radio" name="exportQuality" value="standard" checked />
-        </label>
-        <label class="quality-option">
-          <span><b>Alta qualidade</b><small>Mais definição e arquivo maior</small></span>
-          <input type="radio" name="exportQuality" value="high" />
-        </label>
+        <label><span><strong>Padrão</strong><small>Boa leitura e arquivo menor.</small></span><input type="radio" name="exportQuality" value="standard" checked /></label>
+        <label><span><strong>Alta qualidade</strong><small>Mais definição e arquivo maior.</small></span><input type="radio" name="exportQuality" value="high" /></label>
       </fieldset>
-
+      <div id="exportProgressWrap" class="progress hidden"><div class="progress-track"><div id="exportProgressBar" class="progress-bar"></div></div><span id="exportProgressText"></span></div>
       <p id="exportNote" class="export-note"></p>
-      <div id="exportProgressWrap" class="export-progress hidden">
-        <div class="export-progress-track"><div id="exportProgressBar" class="export-progress-bar"></div></div>
-        <span id="exportProgressText"></span>
-      </div>
-      <button id="exportStartBtn" class="export-start" type="button"><span>⇩</span> Gerar e salvar</button>
+      <button id="exportStartBtn" class="export-start" type="button">⇩ Gerar e salvar</button>
     </div>
   </div>
 
-  <script src="split-range.js"></script>
-  <script src="ux-fixes.js"></script>
   <script type="module" src="app.js"></script>
-  <script type="module" src="export.js"></script>
 </body>
 </html>
