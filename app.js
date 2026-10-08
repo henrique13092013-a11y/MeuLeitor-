@@ -71,6 +71,8 @@ function manualModeAt(page) {
 
 function setManualModeFromHere(mode) {
   splitRules = splitRules.filter(r => r.page !== pageNum);
+  const nextRule = splitRules.find(r => r.page > pageNum);
+  if (!nextRule && pageNum < pdf.numPages) splitRules.push({ page: pageNum + 1, mode: manualModeAt(pageNum + 1) });
   splitRules.push({ page: pageNum, mode });
   splitRules.sort((a,b) => a.page - b.page);
   saveSplitRules();
@@ -80,11 +82,12 @@ function setManualModeFromHere(mode) {
 function updateQuickSplitButton(layout = null) {
   if (!els.splitQuickBtn || !pdf) return;
   const isSplit = layout ? layout.split : manualModeAt(pageNum) === 'split';
-  els.splitQuickBtn.textContent = isSplit ? '✂ Pausar daqui' : '✂ Dividir daqui';
+  els.splitQuickBtn.querySelector('.tool-label').textContent = isSplit ? 'Página inteira' : 'Dividir página';
+  els.splitQuickBtn.querySelector('.tool-icon').textContent = isSplit ? '▣' : '✂';
   els.splitQuickBtn.classList.toggle('active', isSplit);
   els.splitQuickBtn.title = isSplit
-    ? 'Exibir página inteira a partir desta página'
-    : 'Forçar divisão a partir desta página';
+    ? 'Mostrar esta folha inteira, sem divisão'
+    : 'Dividir esta folha em duas páginas';
 }
 
 function applyZoomStyle() {
@@ -372,7 +375,8 @@ async function renderCurrent() {
     ctx.fillRect(0, 0, els.canvas.width, els.canvas.height);
     ctx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
 
-    els.pageLabel.textContent = `PDF ${pageNum} / ${pdf.numPages}`;
+    els.pageLabel.textContent = `Página de leitura: calculando…`;
+    updateReadingCounter(token);
     if (layout.split && layout.axis === 'vertical') {
       els.sideLabel.textContent = half === 1 ? (prefs.rtl ? 'direita · 1ª metade' : 'esquerda · 1ª metade') : (prefs.rtl ? 'esquerda · 2ª metade' : 'direita · 2ª metade');
     } else if (layout.split) {
@@ -593,3 +597,25 @@ els.stage.addEventListener('click', () => { if (document.body.classList.contains
 homeBackBtn.addEventListener('click', () => setFocusMode(false));
 renderRecent();
 updateRuleReview();
+
+// Numeração sequencial das páginas de leitura, incluindo cada metade.
+let counterGeneration = 0;
+const countCache = new Map();
+async function updateReadingCounter(token) {
+  if (!pdf) return;
+  const generation = ++counterGeneration;
+  let before = 0, total = 0;
+  for (let n = 1; n <= pdf.numPages; n++) {
+    if (generation !== counterGeneration || token !== renderToken) return;
+    const page = await pdf.getPage(n);
+    const layout = await pageLayout(page);
+    const count = layout.split ? 2 : 1;
+    if (n < pageNum) before += count;
+    total += count;
+    if (n % 20 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  if (generation !== counterGeneration || token !== renderToken) return;
+  const current = before + (half === 2 ? 2 : 1);
+  els.pageLabel.textContent = 'Leitura ' + current + ' / ' + total;
+  els.sideLabel.textContent += ' · PDF original ' + pageNum + ' / ' + pdf.numPages;
+}
