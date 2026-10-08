@@ -33,13 +33,14 @@ function baseName(name) {
 function prefs() {
   const defaults = { split:false, autoLandscape:true, splitAt:50, gutter:1, crop:false, cropPct:3, rtl:false };
   try {
-    return Object.assign(defaults, JSON.parse(localStorage.getItem('leitorAcademicoPrefs') || '{}'));
+    const p = Object.assign(defaults, JSON.parse(localStorage.getItem('leitorAcademicoPrefs') || '{}')); p.split = false; p.smart = false; return p;
   } catch (_) {
     return defaults;
   }
 }
 
-function rotation() {
+function rotation(pageNumber) { try { const map = JSON.parse(localStorage.getItem(`leitor-rotations:${fileKey}`) || '{}'); return Number(map[pageNumber] || 0); } catch { return 0; } }
+function legacyRotation() {
   try {
     const saved = JSON.parse(localStorage.getItem(`leitor-pos:${fileKey}`) || '{}');
     return ((saved.rotation || 0) % 360 + 360) % 360;
@@ -57,14 +58,7 @@ function rules() {
   }
 }
 
-function modeAt(page, list) {
-  let mode = 'auto';
-  for (const rule of list) {
-    if (rule.page > page) break;
-    if (['split','whole','auto'].includes(rule.mode)) mode = rule.mode;
-  }
-  return mode;
-}
+function modeAt(page, list) { return list.find(r => r.page === page)?.mode || 'whole'; }
 
 function qualityConfig() {
   const value = document.querySelector('input[name="exportQuality"]:checked')?.value || 'standard';
@@ -180,7 +174,7 @@ async function exportPdf() {
   try {
     const settings = prefs();
     const splitRules = rules();
-    const rotate = rotation();
+    const rotate = null;
     const quality = qualityConfig();
     const out = await PDFDocument.create();
 
@@ -190,7 +184,7 @@ async function exportPdf() {
 
       const page = await pdf.getPage(pageNumber);
       const mode = modeAt(pageNumber, splitRules);
-      const initialViewport = page.getViewport({ scale:1, rotation:(page.rotate + rotate) % 360 });
+      const initialViewport = page.getViewport({ scale:1, rotation:(page.rotate + rotation(pageNumber)) % 360 });
 
       let split = mode === 'split' || (mode === 'auto' && settings.split && (!settings.autoLandscape || initialViewport.width > initialViewport.height * 1.08));
       if (mode === 'whole') split = false;
