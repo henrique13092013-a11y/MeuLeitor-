@@ -29,9 +29,9 @@ const analysisCache = new Map();
 const visualAxisCache = new Map();
 
 const prefs = {
-  smart: true,
+  smart: false,
   split: false,
-  autoLandscape: true,
+  autoLandscape: false,
   splitAt: 50,
   gutter: 1,
   crop: false,
@@ -60,24 +60,8 @@ function saveSplitRules() {
   if (key) localStorage.setItem(key, JSON.stringify(splitRules));
 }
 
-function manualModeAt(page) {
-  let mode = 'auto';
-  for (const rule of splitRules) {
-    if (rule.page > page) break;
-    mode = rule.mode;
-  }
-  return mode;
-}
-
-function setManualModeFromHere(mode) {
-  splitRules = splitRules.filter(r => r.page !== pageNum);
-  const nextRule = splitRules.find(r => r.page > pageNum);
-  if (!nextRule && pageNum < pdf.numPages) splitRules.push({ page: pageNum + 1, mode: manualModeAt(pageNum + 1) });
-  splitRules.push({ page: pageNum, mode });
-  splitRules.sort((a,b) => a.page - b.page);
-  saveSplitRules();
-  updateRuleReview();
-}
+function manualModeAt(page) { return splitRules.find(r => r.page === page)?.mode || 'whole'; }
+function setManualModeFromHere(mode) { splitRules = splitRules.filter(r => r.page !== pageNum); splitRules.push({page:pageNum,mode}); splitRules.sort((a,b)=>a.page-b.page); saveSplitRules(); updateRuleReview(); }
 
 function updateQuickSplitButton(layout = null) {
   if (!els.splitQuickBtn || !pdf) return;
@@ -101,9 +85,10 @@ function applyZoomStyle() {
 function loadGlobalPrefs() {
   const p = JSON.parse(localStorage.getItem('leitorAcademicoPrefs') || '{}');
   Object.assign(prefs, p);
-  els.smartToggle.checked = prefs.smart;
-  els.splitToggle.checked = prefs.split;
-  els.autoLandscape.checked = prefs.autoLandscape;
+  prefs.smart = false; prefs.split = false; prefs.autoLandscape = false;
+  els.smartToggle.checked = prefs.smart; els.smartToggle.disabled = true;
+  els.splitToggle.checked = prefs.split; els.splitToggle.disabled = true;
+  els.autoLandscape.checked = prefs.autoLandscape; els.autoLandscape.disabled = true;
   els.splitSlider.value = prefs.splitAt;
   els.gutterSlider.value = prefs.gutter;
   els.cropToggle.checked = prefs.crop;
@@ -119,6 +104,11 @@ function updateOutputs() {
   els.gutterOutput.value = `${Number(prefs.gutter).toFixed(1)}%`;
   els.cropOutput.value = `${Number(prefs.cropPct).toFixed(prefs.cropPct % 1 ? 1 : 0)}%`;
 }
+let pageRotations = {};
+function rotationKey() { return `leitor-rotations:${fileKey}`; }
+function loadPageRotations() { try { pageRotations = JSON.parse(localStorage.getItem(rotationKey()) || '{}') || {}; } catch { pageRotations = {}; } }
+function rotationAt(page) { return Number(pageRotations[page] || 0); }
+function savePageRotation() { pageRotations[pageNum] = rotation; localStorage.setItem(rotationKey(), JSON.stringify(pageRotations)); }
 function savePosition() {
   if (!fileKey) return;
   localStorage.setItem(`leitor-pos:${fileKey}`, JSON.stringify({pageNum, half, rotation}));
@@ -128,8 +118,8 @@ function restorePosition() {
   if (pos) {
     pageNum = Math.max(1, Math.min(pdf.numPages, pos.pageNum || 1));
     half = pos.half || 0;
-    rotation = ((pos.rotation || 0) % 360 + 360) % 360;
-  } else { pageNum = 1; half = 0; rotation = 0; }
+    rotation = rotationAt(pageNum);
+  } else { pageNum = 1; half = 0; rotation = rotationAt(1); }
 }
 
 function cardinalAngle(deg) {
@@ -188,14 +178,14 @@ function textSpreadAxis(page, analysis, effectiveRotation) {
 
 async function pageLayout(page) {
   const analysis = await analyzePage(page);
-  const autoExtra = prefs.smart ? analysis.autoRotation : 0;
-  const effectiveRotation = ((page.rotate || 0) + rotation + autoExtra) % 360;
+  const autoExtra = 0;
+  const effectiveRotation = ((page.rotate || 0) + rotationAt(page.pageNumber) + autoExtra) % 360;
   const viewport = page.getViewport({ scale: 1, rotation: effectiveRotation });
   const visualKey = `${page.pageNumber}:${effectiveRotation}`;
   const manualMode = manualModeAt(page.pageNumber);
   let axis = null;
 
-  if (manualMode !== 'whole' && prefs.smart) {
+  if (false) {
     axis = textSpreadAxis(page, analysis, effectiveRotation) || visualAxisCache.get(visualKey) || null;
   }
 
@@ -208,7 +198,7 @@ async function pageLayout(page) {
     }
   } else if (manualMode === 'whole') {
     axis = null;
-  } else if (!axis && prefs.split) {
+  } else if (false) {
     if (!prefs.autoLandscape || viewport.width > viewport.height * 1.08) axis = 'vertical';
   }
 
@@ -278,6 +268,7 @@ async function openFile(file) {
     analysisCache.clear();
     visualAxisCache.clear();
     els.fileName.textContent = file.name;
+    loadPageRotations();
     restorePosition();
     loadSplitRules();
     rememberRecent(file);
@@ -321,7 +312,7 @@ async function renderCurrent() {
     await page.render({ canvasContext: sctx, viewport }).promise;
     if (token !== renderToken) return;
 
-    if (prefs.smart && layout.manualMode !== 'whole' && !layout.axis && layout.analysis.textChars < 40) {
+    if (false) {
       const visualAxis = visualSpreadAxis(source);
       if (visualAxis) {
         visualAxisCache.set(layout.visualKey, visualAxis);
@@ -400,7 +391,7 @@ async function next() {
   const p = await pdf.getPage(pageNum);
   const layout = await pageLayout(p);
   if (layout.split && half === 1) half = 2;
-  else if (pageNum < pdf.numPages) { pageNum++; half = 0; await normalizeHalf(); }
+  else if (pageNum < pdf.numPages) { pageNum++; rotation = rotationAt(pageNum); half = 0; await normalizeHalf(); }
   await renderCurrent();
   els.stage.scrollTo({top:0,left:0,behavior:'auto'});
   } finally { navigationBusy = false; }
@@ -415,6 +406,7 @@ async function prev() {
   if (layout.split && half === 2) half = 1;
   else if (pageNum > 1) {
     pageNum--;
+    rotation = rotationAt(pageNum);
     const prevPage = await pdf.getPage(pageNum);
     half = (await pageLayout(prevPage)).split ? 2 : 0;
   }
@@ -437,8 +429,8 @@ function closeControlsAfterAdjustment(delay = 550) {
 [els.fileInput, els.fileInputBig].forEach(input => input.addEventListener('change', e => openFile(e.target.files[0])));
 els.prevBtn.addEventListener('click', prev);
 els.nextBtn.addEventListener('click', next);
-els.rotateLeftBtn.addEventListener('click', async () => { rotation = (rotation + 270) % 360; half = 0; await normalizeHalf(); await renderCurrent(); closeControlsAfterAdjustment(); });
-els.rotateRightBtn.addEventListener('click', async () => { rotation = (rotation + 90) % 360; half = 0; await normalizeHalf(); await renderCurrent(); closeControlsAfterAdjustment(); });
+els.rotateLeftBtn.addEventListener('click', async () => { rotation = (rotationAt(pageNum) + 270) % 360; savePageRotation(); half = 0; await normalizeHalf(); await renderCurrent(); closeControlsAfterAdjustment(); });
+els.rotateRightBtn.addEventListener('click', async () => { rotation = (rotationAt(pageNum) + 90) % 360; savePageRotation(); half = 0; await normalizeHalf(); await renderCurrent(); closeControlsAfterAdjustment(); });
 els.zoomInBtn.addEventListener('click', () => { zoom = Math.min(4, zoom * 1.15); applyZoomStyle(); closeControlsAfterAdjustment(); });
 els.zoomOutBtn.addEventListener('click', () => { zoom = Math.max(.5, zoom / 1.15); applyZoomStyle(); closeControlsAfterAdjustment(); });
 els.fitBtn.addEventListener('click', () => { zoom = 1; applyZoomStyle(); closeControlsAfterAdjustment(); });
@@ -593,7 +585,7 @@ function updateRuleReview() {
   splitRules.forEach(rule => {
     const btn = document.createElement('button'); btn.type = 'button';
     btn.textContent = 'Página ' + rule.page + ' · ' + ({split:'Dividir',whole:'Pausar',auto:'Automático'}[rule.mode]);
-    btn.addEventListener('click', async () => { pageNum = rule.page; half = 0; await normalizeHalf(); await renderCurrent(); els.controls.classList.remove('open'); });
+    btn.addEventListener('click', async () => { pageNum = rule.page; rotation = rotationAt(pageNum); half = 0; await normalizeHalf(); await renderCurrent(); els.controls.classList.remove('open'); });
     target.append(btn);
   });
 }
@@ -651,7 +643,7 @@ async function jumpToPage(target, remember = true) {
   const n = Math.max(1, Math.min(pdf.numPages, Math.round(Number(target))));
   if (!Number.isFinite(n)) return;
   if (remember && (pageNum !== n)) jumpOrigin = {pageNum, half};
-  pageNum = n; half = 0;
+  pageNum = n; rotation = rotationAt(pageNum); half = 0;
   await normalizeHalf(); await renderCurrent();
   els.stage.scrollTo({top:0,left:0,behavior:'auto'});
 }
@@ -661,7 +653,7 @@ pageSeek.addEventListener('change', () => jumpToPage(pageSeek.value));
 returnJumpBtn.addEventListener('click', async () => {
   if (!jumpOrigin) return;
   const previous = jumpOrigin; jumpOrigin = null;
-  pageNum = previous.pageNum; half = previous.half;
+  pageNum = previous.pageNum; rotation = rotationAt(pageNum); half = previous.half;
   await renderCurrent();
   els.stage.scrollTo({top:0,left:0,behavior:'auto'});
 });
