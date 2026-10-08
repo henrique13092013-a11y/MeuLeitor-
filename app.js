@@ -74,6 +74,7 @@ function setManualModeFromHere(mode) {
   splitRules.push({ page: pageNum, mode });
   splitRules.sort((a,b) => a.page - b.page);
   saveSplitRules();
+  updateRuleReview();
 }
 
 function updateQuickSplitButton(layout = null) {
@@ -276,6 +277,8 @@ async function openFile(file) {
     els.fileName.textContent = file.name;
     restorePosition();
     loadSplitRules();
+    rememberRecent(file);
+    updateRuleReview();
     els.emptyState.classList.add('hidden');
     els.reader.classList.remove('hidden');
     await normalizeHalf();
@@ -541,3 +544,52 @@ homeBackBtn.addEventListener('click', () => {
 const backObserver = new MutationObserver(updateHomeBack);
 backObserver.observe(els.reader, { attributes: true, attributeFilter: ['class'] });
 updateHomeBack();
+
+// Biblioteca leve: registra apenas metadados, sem guardar conteúdo dos PDFs.
+const recentEl = document.getElementById('recentFiles');
+function recentList() { try { return JSON.parse(localStorage.getItem('meuleitor-recent') || '[]'); } catch { return []; } }
+function renderRecent() {
+  const entries = recentList();
+  recentEl.replaceChildren();
+  if (!entries.length) return;
+  const title = document.createElement('b'); title.textContent = 'Lidos recentemente'; recentEl.append(title);
+  entries.forEach(entry => {
+    const row = document.createElement('div'); row.className = 'recent-row';
+    const label = document.createElement('span'); label.textContent = entry.name;
+    const action = document.createElement('button'); action.type = 'button'; action.textContent = 'Abrir novamente';
+    action.addEventListener('click', () => { els.fileInputBig.click(); });
+    row.append(label, action); recentEl.append(row);
+  });
+  const note = document.createElement('small'); note.textContent = 'Por privacidade, os arquivos não são armazenados. Selecione o PDF novamente para continuar de onde parou.'; recentEl.append(note);
+}
+function rememberRecent(file) {
+  const key = file.name + ':' + file.size + ':' + file.lastModified;
+  const entries = recentList().filter(item => item.key !== key);
+  entries.unshift({ key, name: file.name });
+  try { localStorage.setItem('meuleitor-recent', JSON.stringify(entries.slice(0, 6))); } catch {}
+  renderRecent();
+}
+function updateRuleReview() {
+  const target = document.getElementById('ruleReview'); if (!target) return;
+  target.replaceChildren();
+  if (!splitRules.length) { target.textContent = 'Nenhuma divisão manual marcada.'; return; }
+  splitRules.forEach(rule => {
+    const btn = document.createElement('button'); btn.type = 'button';
+    btn.textContent = 'Página ' + rule.page + ' · ' + ({split:'Dividir',whole:'Pausar',auto:'Automático'}[rule.mode]);
+    btn.addEventListener('click', async () => { pageNum = rule.page; half = 0; await normalizeHalf(); await renderCurrent(); els.controls.classList.remove('open'); });
+    target.append(btn);
+  });
+}
+const focusBtn = document.getElementById('focusBtn');
+function setFocusMode(on) {
+  document.body.classList.toggle('focus-mode', on);
+  focusBtn.setAttribute('aria-pressed', String(on));
+  focusBtn.querySelector('.tool-label').textContent = on ? 'Sair do foco' : 'Foco';
+  if (on) els.controls.classList.remove('open');
+  setTimeout(() => { if (pdf) renderCurrent(); }, 60);
+}
+focusBtn.addEventListener('click', () => setFocusMode(!document.body.classList.contains('focus-mode')));
+els.stage.addEventListener('click', () => { if (document.body.classList.contains('focus-mode')) setFocusMode(false); });
+homeBackBtn.addEventListener('click', () => setFocusMode(false));
+renderRecent();
+updateRuleReview();
