@@ -383,6 +383,7 @@ async function renderCurrent() {
       els.sideLabel.textContent = half === 1 ? 'superior · 1ª metade' : 'inferior · 2ª metade';
     } else els.sideLabel.textContent = 'página inteira';
     els.smartStatus.textContent = smartStatusText(layout);
+    syncPageNavigation();
     updateQuickSplitButton(layout);
     savePosition();
   } finally {
@@ -390,7 +391,11 @@ async function renderCurrent() {
   }
 }
 
+let navigationBusy = false;
 async function next() {
+  if (navigationBusy) return;
+  navigationBusy = true;
+  try {
   if (!pdf) return;
   const p = await pdf.getPage(pageNum);
   const layout = await pageLayout(p);
@@ -398,8 +403,12 @@ async function next() {
   else if (pageNum < pdf.numPages) { pageNum++; half = 0; await normalizeHalf(); }
   await renderCurrent();
   els.stage.scrollTo({top:0,left:0,behavior:'auto'});
+  } finally { navigationBusy = false; }
 }
 async function prev() {
+  if (navigationBusy) return;
+  navigationBusy = true;
+  try {
   if (!pdf) return;
   const p = await pdf.getPage(pageNum);
   const layout = await pageLayout(p);
@@ -411,6 +420,7 @@ async function prev() {
   }
   await renderCurrent();
   els.stage.scrollTo({top:0,left:0,behavior:'auto'});
+  } finally { navigationBusy = false; }
 }
 
 function closeControlsAfterAdjustment(delay = 550) {
@@ -474,8 +484,11 @@ els.controlsClose.addEventListener('click', () => els.controls.classList.remove(
 els.stage.addEventListener('click', () => { if (isMobile()) els.controls.classList.remove('open'); });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowRight' || e.key === 'PageDown') next();
-  if (e.key === 'ArrowLeft' || e.key === 'PageUp') prev();
+  if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
+  if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); next(); }
+  if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+  if (e.key === 'Home' && pdf) { e.preventDefault(); jumpToPage(1); }
+  if (e.key === 'End' && pdf) { e.preventDefault(); jumpToPage(pdf.numPages); }
 });
 let touchStartX = null, touchStartY = null;
 let pinchStartDistance = null, pinchStartZoom = 1, pinchActive = false;
@@ -619,3 +632,36 @@ async function updateReadingCounter(token) {
   els.pageLabel.textContent = 'Leitura ' + current + ' / ' + total;
   els.sideLabel.textContent += ' · PDF original ' + pageNum + ' / ' + pdf.numPages;
 }
+
+// Navegação por folha original, com retorno ao ponto anterior ao salto.
+const pageSeek = document.getElementById('pageSeek');
+const pageJump = document.getElementById('pageJump');
+const returnJumpBtn = document.getElementById('returnJumpBtn');
+let jumpOrigin = null;
+function syncPageNavigation() {
+  if (!pdf) return;
+  pageSeek.max = String(pdf.numPages);
+  pageSeek.value = String(pageNum);
+  pageSeek.title = 'Folha original ' + pageNum + ' de ' + pdf.numPages;
+  pageJump.max = String(pdf.numPages);
+  returnJumpBtn.classList.toggle('hidden', !jumpOrigin);
+}
+async function jumpToPage(target, remember = true) {
+  if (!pdf) return;
+  const n = Math.max(1, Math.min(pdf.numPages, Math.round(Number(target))));
+  if (!Number.isFinite(n)) return;
+  if (remember && (pageNum !== n)) jumpOrigin = {pageNum, half};
+  pageNum = n; half = 0;
+  await normalizeHalf(); await renderCurrent();
+  els.stage.scrollTo({top:0,left:0,behavior:'auto'});
+}
+document.getElementById('pageJumpBtn').addEventListener('click', () => jumpToPage(pageJump.value));
+pageJump.addEventListener('keydown', e => { if (e.key === 'Enter') jumpToPage(pageJump.value); });
+pageSeek.addEventListener('change', () => jumpToPage(pageSeek.value));
+returnJumpBtn.addEventListener('click', async () => {
+  if (!jumpOrigin) return;
+  const previous = jumpOrigin; jumpOrigin = null;
+  pageNum = previous.pageNum; half = previous.half;
+  await renderCurrent();
+  els.stage.scrollTo({top:0,left:0,behavior:'auto'});
+});
