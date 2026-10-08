@@ -36,12 +36,14 @@
     const label = button.querySelector('.tool-label');
     const icon = button.querySelector('.tool-icon');
     const wanted = active ? 'Parar daqui →' : 'Dividir daqui →';
-    if (label && label.textContent !== wanted) label.textContent = wanted;
-    if (icon) icon.textContent = active ? '▣' : '✂';
-    button.title = active
+    const wantedIcon = active ? '▣' : '✂';
+    const title = active
       ? 'Manter esta folha e as próximas inteiras'
       : 'Dividir esta folha e todas as próximas';
-    button.setAttribute('aria-label', button.title);
+    if (label && label.textContent !== wanted) label.textContent = wanted;
+    if (icon && icon.textContent !== wantedIcon) icon.textContent = wantedIcon;
+    if (button.title !== title) button.title = title;
+    if (button.getAttribute('aria-label') !== title) button.setAttribute('aria-label', title);
   }
 
   function showToast(message) {
@@ -89,9 +91,8 @@
 
     const desiredMode = button.classList.contains('active') ? 'whole' : 'split';
 
-    // O app atualiza primeiro a página corrente. Depois expandimos a decisão
-    // para todas as folhas seguintes e reabrimos o mesmo File já selecionado,
-    // sem pedir ao usuário que escolha o PDF novamente.
+    // O listener original altera a folha atual. Quando essa alteração aparece
+    // no armazenamento, ampliamos a mesma decisão até a última folha.
     for (let attempt = 0; attempt < 40; attempt++) {
       await wait(50);
       const current = readRules(key).find(rule => rule.page === start)?.mode;
@@ -100,6 +101,9 @@
 
     writeRange(key, start, end, desiredMode);
     await wait(20);
+
+    // Reprocessa o mesmo arquivo já selecionado para sincronizar as regras
+    // mantidas em memória pelo leitor. Não abre o seletor de arquivos.
     input.dispatchEvent(new Event('change', { bubbles: true }));
     showToast(desiredMode === 'split'
       ? `Divisão aplicada da página ${start} até o fim.`
@@ -119,16 +123,14 @@
 
     refreshButtonLabel(button);
     const buttonObserver = new MutationObserver(() => refreshButtonLabel(button));
-    buttonObserver.observe(button, { attributes: true, childList: true, subtree: true, characterData: true });
+    buttonObserver.observe(button, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true, characterData: true });
 
-    // Captura apenas a intenção; o listener original continua executando a
-    // alteração da página corrente. Em seguida expandimos o intervalo.
     button.addEventListener('click', () => applyFromHere(button), true);
 
     const review = document.getElementById('ruleReview');
     if (review) {
       const reviewObserver = new MutationObserver(compactRuleReview);
-      reviewObserver.observe(review, { childList: true, subtree: true });
+      reviewObserver.observe(review, { childList: true });
       compactRuleReview();
     }
   }
