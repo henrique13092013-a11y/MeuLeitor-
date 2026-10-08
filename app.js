@@ -527,3 +527,17 @@ window.addEventListener('resize', () => {
 });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 loadGlobalPrefs();
+// Retorno seguro à tela inicial: mantém as preferências e a posição salvas.
+const homeBackBtn = document.getElementById('homeBackBtn');
+function updateHomeBack() { homeBackBtn.classList.toggle('hidden', els.reader.classList.contains('hidden')); }
+homeBackBtn.addEventListener('click', () => {
+  savePosition();
+  els.controls.classList.remove('open');
+  document.getElementById('exportModal').classList.add('hidden');
+  els.reader.classList.add('hidden');
+  els.emptyState.classList.remove('hidden');
+  updateHomeBack();
+});
+const backObserver = new MutationObserver(updateHomeBack);
+backObserver.observe(els.reader, { attributes: true, attributeFilter: ['class'] });
+updateHomeBack();
