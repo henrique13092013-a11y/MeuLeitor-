@@ -114,3 +114,47 @@ canvas { display: block; max-width: none; background: white; box-shadow: 0 4px 2
   .open-btn { padding: 8px 10px; font-size: 12px; }
   .canvas-wrap { padding-top: 8px; }
 }
+
+.canvas-wrap.zoomed { justify-content: flex-start; }
+.reader-tools { display: none; }
+.split-quick {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+.split-quick.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+
+@media (max-width: 760px) {
+  .reader-tools {
+    display: flex;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 18;
+    gap: 6px;
+    align-items: center;
+  }
+  .reader-tools .controls-toggle {
+    display: block;
+    position: static;
+    top: auto;
+    right: auto;
+    z-index: auto;
+    padding: 7px 10px;
+    font-size: 12px;
+    opacity: .9;
+  }
+  .split-quick {
+    display: block;
+    padding: 7px 10px;
+    font-size: 12px;
+    opacity: .92;
+  }
+}
