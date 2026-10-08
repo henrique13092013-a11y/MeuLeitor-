@@ -1,4 +1,4 @@
-const CACHE = 'meuleitor-v7';
+const CACHE = 'meuleitor-v8';
 const APP = [
   './',
   './index.html',
