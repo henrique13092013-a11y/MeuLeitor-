@@ -327,3 +327,11 @@ canvas { display: block; max-width: none; background: white; box-shadow: 0 6px 2
 
 .page-info { min-width:0; }
 .page-info b { font-variant-numeric:tabular-nums; }
+
+.page-jump { display:flex; justify-content:center; align-items:center; gap:5px; margin-top:3px; }
+.page-jump input { width:60px; min-height:26px; border:1px solid var(--border); border-radius:7px; padding:3px 5px; background:var(--panel-solid); color:var(--text); font-size:11px; }
+.page-jump button { border:1px solid var(--border); border-radius:7px; background:var(--panel-solid); color:var(--text); padding:5px 8px; font-size:11px; cursor:pointer; }
+#pageSeek { display:block; width:min(300px,85%); height:12px; margin:3px auto 0; accent-color:var(--accent); cursor:pointer; }
+.reader { grid-template-rows:1fr 98px; }
+@media(max-width:760px) { .reader { grid-template-rows:1fr 94px; } .reader-tools { bottom:102px; } .controls { bottom:100px; } }
+.focus-mode .reader { grid-template-rows:1fr; }
