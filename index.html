@@ -2,8 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#0b1f36" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f9fc" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="MeuLeitor" />
@@ -32,7 +32,7 @@
         <img class="empty-app-icon" src="icon.svg" alt="" />
         <p class="eyebrow">MEULEITOR</p>
         <h1>PDFs difíceis,<br>leitura simples.</h1>
-        <p class="empty-lead">Gire trechos, divida páginas duplas e salve um PDF ajustado. O arquivo fica no seu aparelho.</p>
+        <p class="empty-lead">Gire trechos, divida páginas duplas e leia scans com conforto no celular.</p>
         <label class="primary-open">＋ Selecionar PDF<input id="fileInputBig" type="file" accept="application/pdf,.pdf" hidden /></label>
         <div id="recentFiles" class="recent-files" aria-live="polite"></div>
       </div>
@@ -42,15 +42,15 @@
       <section id="stage" class="stage" aria-label="Página do PDF">
         <div id="loading" class="loading hidden">Carregando…</div>
         <div id="canvasWrap" class="canvas-wrap"><canvas id="pageCanvas"></canvas></div>
+        <button id="zoomResetBtn" class="zoom-reset hidden" type="button" aria-label="Voltar ao enquadramento">100%</button>
       </section>
 
       <div class="quick-tools" aria-label="Ações rápidas">
-        <button id="splitQuickBtn" class="tool-chip" type="button">
+        <div id="splitQuickState" class="split-state hidden"></div>
+        <button id="splitQuickBtn" class="tool-chip split-tool" type="button">
           <span class="tool-icon">✂</span><span id="splitQuickLabel">Dividir daqui</span>
         </button>
-        <button id="controlsToggle" class="tool-chip" type="button">
-          <span class="tool-icon">⚙</span><span>Ajustes</span>
-        </button>
+        <button id="controlsToggle" class="more-btn" type="button" aria-label="Ajustar documento" title="Ajustar documento">⋯</button>
       </div>
 
       <nav class="bottom-nav" aria-label="Navegação do documento">
@@ -62,17 +62,18 @@
         <button id="nextBtn" class="nav-btn" type="button" aria-label="Próxima página">›</button>
       </nav>
 
-      <aside id="controls" class="sheet controls" aria-label="Ajustes do documento">
+      <aside id="controls" class="sheet controls" aria-label="Ajustar PDF">
+        <div class="sheet-grabber" aria-hidden="true"></div>
         <div class="sheet-head">
-          <div><strong>Ajustes</strong><small>Ficam abertos até você fechar.</small></div>
+          <div><strong>Ajustar PDF</strong><small>As alterações ficam salvas neste aparelho.</small></div>
           <button id="controlsClose" class="close-btn" type="button" aria-label="Fechar ajustes">×</button>
         </div>
 
         <section class="settings-section">
-          <div class="section-title"><strong>Orientação</strong><small>O giro vale desta folha em diante, até você girar de novo.</small></div>
+          <div class="section-title"><strong>Orientação</strong><small>O giro vale desta folha em diante, até você girar novamente.</small></div>
           <div class="segmented two">
-            <button id="rotateLeftBtn" type="button">↶ Girar à esquerda</button>
-            <button id="rotateRightBtn" type="button">↷ Girar à direita</button>
+            <button id="rotateLeftBtn" type="button">↶ Girar daqui</button>
+            <button id="rotateRightBtn" type="button">↷ Girar daqui</button>
           </div>
           <div id="rotationStatus" class="status-line"></div>
         </section>
@@ -85,27 +86,31 @@
         </section>
 
         <section class="settings-section">
-          <div class="section-title"><strong>Leitura</strong></div>
-          <div class="segmented three">
+          <div class="section-title"><strong>Visualização</strong><small>No iPhone, use pinça para ampliar e dois toques para alternar entre ajuste e 200%.</small></div>
+          <div class="segmented three zoom-controls">
             <button id="zoomOutBtn" type="button" aria-label="Diminuir zoom">−</button>
-            <button id="fitBtn" type="button"><span id="zoomLabel">100%</span></button>
+            <button id="fitBtn" type="button" aria-label="Voltar ao enquadramento"><span id="zoomLabel">100%</span></button>
             <button id="zoomInBtn" type="button" aria-label="Aumentar zoom">＋</button>
           </div>
           <label class="switch-row"><span><strong>Cortar margens</strong><small>Recorta as bordas do scan.</small></span><input id="cropToggle" type="checkbox" /></label>
           <label class="slider-row" id="cropSliderRow"><span>Margem externa <output id="cropOutput">3%</output></span><input id="cropSlider" type="range" min="0" max="14" value="3" step="0.5" /></label>
-          <label class="switch-row"><span><strong>Ordem invertida</strong><small>Use para livros que começam pela direita.</small></span><input id="rtlToggle" type="checkbox" /></label>
+          <label class="switch-row"><span><strong>Ordem invertida</strong><small>Para livros que começam pela direita.</small></span><input id="rtlToggle" type="checkbox" /></label>
+        </section>
+
+        <section class="settings-section compact-options">
           <label class="switch-row"><span><strong>Tema escuro</strong></span><input id="themeToggle" type="checkbox" /></label>
         </section>
 
-        <section class="settings-section">
-          <div class="section-title"><strong>Alterações deste arquivo</strong><small>Marcos que passam a valer a partir de determinada folha.</small></div>
+        <details class="settings-section history-section">
+          <summary>Alterações deste arquivo</summary>
           <div id="rulesSummary" class="rules-summary"></div>
-        </section>
+        </details>
 
         <button id="exportBtn" class="export-btn" type="button" disabled>⇩ Gerar PDF ajustado</button>
       </aside>
 
       <div id="jumpSheet" class="sheet compact-sheet" aria-label="Ir para folha">
+        <div class="sheet-grabber" aria-hidden="true"></div>
         <div class="sheet-head">
           <div><strong>Ir para folha</strong><small>Numeração original do PDF.</small></div>
           <button id="jumpClose" class="close-btn" type="button" aria-label="Fechar navegação">×</button>
@@ -119,8 +124,9 @@
 
   <div id="exportModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
     <div class="modal-card">
+      <div class="sheet-grabber" aria-hidden="true"></div>
       <div class="sheet-head">
-        <div><strong id="exportTitle">Gerar PDF ajustado</strong><small>Aplica os giros, divisões e recortes salvos.</small></div>
+        <div><strong id="exportTitle">Gerar PDF ajustado</strong><small>Aplica giros, divisões e recortes salvos.</small></div>
         <button id="exportCancelBtn" class="close-btn" type="button" aria-label="Fechar">×</button>
       </div>
       <label class="field"><span>Nome do arquivo</span><input id="exportName" type="text" autocomplete="off" spellcheck="false" /></label>
