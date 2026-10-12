@@ -16,10 +16,19 @@
     .quick-tools > button{flex:0 0 auto}
     .reading-btn{min-height:44px;padding:9px 11px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--border);border-radius:14px;background:var(--glass);color:var(--text);backdrop-filter:blur(16px) saturate(150%);box-shadow:var(--shadow-soft);cursor:pointer;font-size:11px;font-weight:850;-webkit-tap-highlight-color:transparent}
     .reading-btn .reading-icon{font-size:16px;line-height:1}.reading-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+    .topbar{transition:transform .22s ease,opacity .18s ease;will-change:transform}
+    main{transition:margin-top .22s ease,height .22s ease}
+    .quick-tools{transition:opacity .2s ease,filter .2s ease}
+    .top-reveal-zone{position:fixed;top:0;left:0;right:0;height:18px;z-index:46;pointer-events:none}
+    body.reader-ui-idle:not(.reading-mode) .topbar{transform:translateY(-110%);opacity:0;pointer-events:none}
+    body.reader-ui-idle:not(.reading-mode) main{height:100dvh;margin-top:-64px}
+    body.reader-ui-idle:not(.reading-mode) .quick-tools{opacity:.32;filter:saturate(.78)}
+    body.reader-ui-idle:not(.reading-mode) .quick-tools:hover,body.reader-ui-idle:not(.reading-mode) .quick-tools:focus-within{opacity:1;filter:none}
+    body.reader-ui-idle:not(.reading-mode) .top-reveal-zone{pointer-events:auto}
     @media(min-width:761px){.quick-tools{top:16px;right:18px;gap:10px}.quick-tools .tool-chip{min-height:42px;padding:8px 11px}.quick-tools .more-btn{width:42px;height:42px}.reading-btn{min-height:42px;padding:8px 11px}}
-    @media(max-width:760px){.reading-btn{width:46px;height:46px;padding:0}.reading-label{display:none}}
+    @media(max-width:760px){.reading-btn{width:46px;height:46px;padding:0}.reading-label{display:none}body.reader-ui-idle:not(.reading-mode) main{margin-top:-58px}body.reader-ui-idle:not(.reading-mode) .quick-tools{opacity:.58;filter:none}.top-reveal-zone{height:22px}}
     body.reading-mode .topbar,body.reading-mode .bottom-nav,body.reading-mode .controls,body.reading-mode .compact-sheet{display:none!important}
-    body.reading-mode main{height:100dvh}
+    body.reading-mode main{height:100dvh;margin-top:0!important}
     body.reading-mode .reader{grid-template-rows:1fr}
     body.reading-mode .canvas-wrap{padding-bottom:18px}
     body.reading-mode .quick-tools{position:fixed;top:12px!important;right:12px!important;left:auto!important;bottom:auto!important;transform:none!important;gap:0}
@@ -40,6 +49,7 @@
     </div>
     <label class="open-btn"><span>＋</span> Abrir<input id="fileInput" type="file" accept="application/pdf,.pdf" hidden /></label>
   </header>
+  <div id="topRevealZone" class="top-reveal-zone" aria-hidden="true"></div>
 
   <main>
     <section id="emptyState" class="empty-state">
@@ -163,8 +173,60 @@
     const controls = document.getElementById('controls');
     const jumpSheet = document.getElementById('jumpSheet');
     const homeBackBtn = document.getElementById('homeBackBtn');
+    const reader = document.getElementById('reader');
+    const stage = document.getElementById('stage');
+    const topbar = document.querySelector('.topbar');
+    const topRevealZone = document.getElementById('topRevealZone');
+    const exportModal = document.getElementById('exportModal');
+    const IDLE_DELAY = 3000;
+    let idleTimer = null;
+    let lastPointerY = Number.POSITIVE_INFINITY;
+
+    function readerIsOpen() {
+      return !reader.classList.contains('hidden');
+    }
+
+    function chromeIsLocked() {
+      return document.body.classList.contains('reading-mode') ||
+        controls.classList.contains('open') ||
+        jumpSheet.classList.contains('open') ||
+        !exportModal.classList.contains('hidden') ||
+        topbar.contains(document.activeElement);
+    }
+
+    function setReaderIdle(on) {
+      if (!readerIsOpen() || document.body.classList.contains('reading-mode')) on = false;
+      document.body.classList.toggle('reader-ui-idle', on);
+      topbar.inert = on;
+      topbar.setAttribute('aria-hidden', String(on));
+      window.setTimeout(() => window.dispatchEvent(new Event('resize')), on ? 230 : 90);
+    }
+
+    function scheduleIdle(delay = IDLE_DELAY) {
+      clearTimeout(idleTimer);
+      if (!readerIsOpen() || chromeIsLocked()) {
+        setReaderIdle(false);
+        return;
+      }
+      idleTimer = window.setTimeout(() => {
+        if (chromeIsLocked()) return;
+        if (window.matchMedia('(pointer:fine)').matches && lastPointerY <= 72) {
+          scheduleIdle(1200);
+          return;
+        }
+        setReaderIdle(true);
+      }, delay);
+    }
+
+    function revealReaderUi(delay = IDLE_DELAY) {
+      if (!readerIsOpen() || document.body.classList.contains('reading-mode')) return;
+      setReaderIdle(false);
+      scheduleIdle(delay);
+    }
 
     function setReadingMode(on) {
+      clearTimeout(idleTimer);
+      setReaderIdle(false);
       document.body.classList.toggle('reading-mode', on);
       readingModeBtn.setAttribute('aria-pressed', String(on));
       readingModeBtn.classList.toggle('active', on);
@@ -175,14 +237,67 @@
       if (on) {
         controls.classList.remove('open');
         jumpSheet.classList.remove('open');
+      } else {
+        scheduleIdle();
       }
       window.setTimeout(() => window.dispatchEvent(new Event('resize')), 80);
     }
 
     readingModeBtn.addEventListener('click', () => setReadingMode(!document.body.classList.contains('reading-mode')));
-    homeBackBtn.addEventListener('click', () => setReadingMode(false));
+    homeBackBtn.addEventListener('click', () => {
+      clearTimeout(idleTimer);
+      setReadingMode(false);
+      setReaderIdle(false);
+    });
+
+    topRevealZone.addEventListener('pointerenter', () => revealReaderUi());
+    topRevealZone.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      revealReaderUi();
+    });
+    document.addEventListener('mousemove', event => {
+      lastPointerY = event.clientY;
+      if (readerIsOpen() && !document.body.classList.contains('reading-mode') && event.clientY <= 22) revealReaderUi();
+    }, { passive: true });
+
+    stage.addEventListener('wheel', event => {
+      if (!readerIsOpen() || chromeIsLocked()) return;
+      if (event.deltaY > 3) {
+        clearTimeout(idleTimer);
+        setReaderIdle(true);
+      } else if (event.deltaY < -3) {
+        revealReaderUi(1800);
+      }
+    }, { passive: true });
+
+    [controls, jumpSheet, exportModal, document.querySelector('.quick-tools')].forEach(element => {
+      element.addEventListener('pointerdown', () => revealReaderUi());
+      element.addEventListener('focusin', () => revealReaderUi());
+    });
+
+    new MutationObserver(() => {
+      if (readerIsOpen()) revealReaderUi();
+      else {
+        clearTimeout(idleTimer);
+        setReaderIdle(false);
+      }
+    }).observe(reader, { attributes: true, attributeFilter: ['class'] });
+
+    const lockObserver = new MutationObserver(() => {
+      if (chromeIsLocked()) {
+        clearTimeout(idleTimer);
+        setReaderIdle(false);
+      } else if (readerIsOpen() && !document.body.classList.contains('reading-mode')) {
+        scheduleIdle();
+      }
+    });
+    [controls, jumpSheet, exportModal].forEach(element => {
+      lockObserver.observe(element, { attributes: true, attributeFilter: ['class'] });
+    });
+
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && document.body.classList.contains('reading-mode')) setReadingMode(false);
+      if (event.key === 'Escape' && document.body.classList.contains('reader-ui-idle')) revealReaderUi();
     });
   </script>
 </body>
