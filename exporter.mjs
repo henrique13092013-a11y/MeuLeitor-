@@ -33,14 +33,34 @@ async function appendPdfPage(out, source, rect, quality) {
   const ratio = canvas.width / canvas.height, width = ratio <= 1 ? 842 * ratio : 842, height = ratio <= 1 ? 842 : 842 / ratio;
   out.addPage([width, height]).drawImage(image, { x: 0, y: 0, width, height });
 }
-async function saveGenerated(bytes, name) {
-  const blob = new Blob([bytes], { type: 'application/pdf' }), file = new File([blob], name, { type: 'application/pdf' });
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name }); return; } catch (error) { if (error?.name === 'AbortError') return; }
+async function chooseSaveHandle(name) {
+  if (!window.isSecureContext || typeof window.showSaveFilePicker !== 'function') return null;
+  try {
+    return await window.showSaveFilePicker({
+      suggestedName: name,
+      types: [{ description: 'Documento PDF', accept: { 'application/pdf': ['.pdf'] } }]
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    console.warn('Seletor de arquivo indisponível; usando download do navegador.', error);
+    return null;
   }
-  const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 120000);
+}
+async function saveGenerated(bytes, name, handle) {
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  if (handle) {
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return;
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
 export async function exportAdjustedPdf({ pdf, outputName, prefs, rotationAt, splitAt, axisForViewport, quality = 'standard', onProgress = () => {} }) {
+  const name = safeName(outputName);
+  const saveHandle = await chooseSaveHandle(name);
   const { PDFDocument } = await import('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm');
   const config = qualityConfig(quality), out = await PDFDocument.create();
   for (let n = 1; n <= pdf.numPages; n++) {
@@ -53,7 +73,6 @@ export async function exportAdjustedPdf({ pdf, outputName, prefs, rotationAt, sp
     for (const rect of exportRects(source, split, axis, prefs)) await appendPdfPage(out, source, rect, config);
   }
   onProgress(100, 'Finalizando…');
-  const name = safeName(outputName);
-  await saveGenerated(await out.save({ useObjectStreams: true }), name);
+  await saveGenerated(await out.save({ useObjectStreams: true }), name, saveHandle);
   return name;
 }
