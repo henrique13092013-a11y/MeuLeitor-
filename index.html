@@ -12,6 +12,21 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    .quick-tools > button{flex:0 0 auto}
+    .reading-btn{min-height:44px;padding:9px 11px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--border);border-radius:14px;background:var(--glass);color:var(--text);backdrop-filter:blur(16px) saturate(150%);box-shadow:var(--shadow-soft);cursor:pointer;font-size:11px;font-weight:850;-webkit-tap-highlight-color:transparent}
+    .reading-btn .reading-icon{font-size:16px;line-height:1}.reading-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+    @media(min-width:761px){.quick-tools{top:16px;right:18px;gap:10px}.quick-tools .tool-chip{min-height:42px;padding:8px 11px}.quick-tools .more-btn{width:42px;height:42px}.reading-btn{min-height:42px;padding:8px 11px}}
+    @media(max-width:760px){.reading-btn{width:46px;height:46px;padding:0}.reading-label{display:none}}
+    body.reading-mode .topbar,body.reading-mode .bottom-nav,body.reading-mode .controls,body.reading-mode .compact-sheet{display:none!important}
+    body.reading-mode main{height:100dvh}
+    body.reading-mode .reader{grid-template-rows:1fr}
+    body.reading-mode .canvas-wrap{padding-bottom:18px}
+    body.reading-mode .quick-tools{position:fixed;top:12px!important;right:12px!important;left:auto!important;bottom:auto!important;transform:none!important;gap:0}
+    body.reading-mode .quick-tools > :not(#readingModeBtn){display:none!important}
+    body.reading-mode #readingModeBtn{display:inline-flex;opacity:.55;background:var(--glass);border-color:var(--border);color:var(--text);transition:opacity .18s ease}
+    body.reading-mode #readingModeBtn:hover,body.reading-mode #readingModeBtn:focus-visible{opacity:1}
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -47,6 +62,7 @@
 
       <div class="quick-tools" aria-label="Ações rápidas">
         <div id="splitQuickState" class="split-state hidden"></div>
+        <button id="readingModeBtn" class="reading-btn" type="button" aria-pressed="false" aria-label="Ativar modo leitura" title="Modo leitura"><span class="reading-icon">⛶</span><span class="reading-label">Leitura</span></button>
         <button id="splitQuickBtn" class="tool-chip split-tool" type="button">
           <span class="tool-icon">✂</span><span id="splitQuickLabel">Dividir daqui</span>
         </button>
@@ -142,5 +158,32 @@
   </div>
 
   <script type="module" src="app.js"></script>
+  <script type="module">
+    const readingModeBtn = document.getElementById('readingModeBtn');
+    const controls = document.getElementById('controls');
+    const jumpSheet = document.getElementById('jumpSheet');
+    const homeBackBtn = document.getElementById('homeBackBtn');
+
+    function setReadingMode(on) {
+      document.body.classList.toggle('reading-mode', on);
+      readingModeBtn.setAttribute('aria-pressed', String(on));
+      readingModeBtn.classList.toggle('active', on);
+      const label = readingModeBtn.querySelector('.reading-label');
+      if (label) label.textContent = on ? 'Sair' : 'Leitura';
+      readingModeBtn.title = on ? 'Sair do modo leitura' : 'Modo leitura';
+      readingModeBtn.setAttribute('aria-label', on ? 'Sair do modo leitura' : 'Ativar modo leitura');
+      if (on) {
+        controls.classList.remove('open');
+        jumpSheet.classList.remove('open');
+      }
+      window.setTimeout(() => window.dispatchEvent(new Event('resize')), 80);
+    }
+
+    readingModeBtn.addEventListener('click', () => setReadingMode(!document.body.classList.contains('reading-mode')));
+    homeBackBtn.addEventListener('click', () => setReadingMode(false));
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && document.body.classList.contains('reading-mode')) setReadingMode(false);
+    });
+  </script>
 </body>
 </html>
